@@ -201,6 +201,15 @@ should become automatic):
   service name can only match as a COMPLETE hyphen-delimited token, never a
   prefix/suffix of a longer one. New regression test:
   `test_calls_edge_not_created_when_service_name_is_a_prefix_of_a_longer_hyphenated_name`.
+  **Validated on the real Cobra cluster, 2026-10-27**: after deploying 0.3.7,
+  `diameter`'s `calls` edges dropped from 6 to the 2 genuine ones
+  (`service/eric-pc-vpn-gateway-forwarder`, `service/eric-log-transformer`)
+  — all 4 false positives (`eric-cm-mediator`/`eric-sec-sip-tls`/
+  `eric-pm-server`/`eric-cm-yang-provider`) gone, exactly as predicted. This
+  closes out the `eric-pc-sm-*` investigation: the mechanism is correct, the
+  genuine dependencies it found are all healthy, and the outage's true
+  cause remains internal to the 6 affected components — not discoverable
+  from cluster state alone with the tools this agent has today.
 - 🔲 **Open — log-content root-cause extraction.** The reasoning pipeline
   fences and lists raw log lines as evidence but never parses them for a
   structural failure signal. Found 2026-10-27 testing the real
