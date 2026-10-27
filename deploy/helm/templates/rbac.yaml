@@ -1,0 +1,60 @@
+{{- if .Values.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "rca-agent.serviceAccountName" . }}
+  labels:
+    {{- include "rca-agent.labels" . | nindent 4 }}
+{{- end }}
+---
+{{- if .Values.rbac.create }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "rca-agent.fullname" . }}-readonly
+  labels:
+    {{- include "rca-agent.labels" . | nindent 4 }}
+# READ-ONLY BY CONSTRUCTION: only get/list/watch. No create/update/patch/delete.
+rules:
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - services
+      - endpoints
+      - events
+      - configmaps
+      - secrets
+      - persistentvolumeclaims
+      - nodes
+      - namespaces
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "rca-agent.fullname" . }}-readonly
+  labels:
+    {{- include "rca-agent.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "rca-agent.fullname" . }}-readonly
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "rca-agent.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

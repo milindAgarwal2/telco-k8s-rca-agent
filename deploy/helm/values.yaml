@@ -1,0 +1,45 @@
+image:
+  repository: rca-agent
+  tag: "0.3.4"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# The namespace holding the 5G core to monitor.
+monitorNamespace: open5gs
+
+agent:
+  reasoningMode: extractive   # extractive | llm
+  clusterEnabled: true        # use the read-only kube client in-cluster
+  logLevel: INFO
+  runbookRagUrl: ""           # existing doc-intelligence RAG service URL
+
+service:
+  type: ClusterIP
+  port: 8080
+
+# Read-only RBAC. The ClusterRole grants ONLY get/list/watch — no write verbs
+# exist, so even a compromised/confused LLM cannot mutate the cluster.
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+  name: ""   # defaults to the release name
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Harden the pod: non-root, read-only root FS, no privilege escalation.
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

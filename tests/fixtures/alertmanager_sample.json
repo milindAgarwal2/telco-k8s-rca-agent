@@ -1,0 +1,30 @@
+{
+  "version": "4",
+  "groupKey": "{}:{alertname=\"SMFHighErrorRate\"}",
+  "status": "firing",
+  "receiver": "rca-agent",
+  "groupLabels": { "alertname": "SMFHighErrorRate" },
+  "commonLabels": { "alertname": "SMFHighErrorRate", "namespace": "open5gs", "severity": "critical" },
+  "commonAnnotations": { "description": "SMF 5xx error rate above threshold" },
+  "externalURL": "http://alertmanager.local",
+  "alerts": [
+    {
+      "status": "firing",
+      "labels": {
+        "alertname": "SMFHighErrorRate",
+        "namespace": "open5gs",
+        "pod": "upf-0",
+        "service": "smf",
+        "severity": "critical"
+      },
+      "annotations": {
+        "description": "SMF session establishment failing; PFCP association to UPF down",
+        "summary": "SMF high error rate"
+      },
+      "startsAt": "2026-10-22T19:02:00Z",
+      "endsAt": "0001-01-01T00:00:00Z",
+      "generatorURL": "http://prometheus.local/graph",
+      "fingerprint": "abc123def456"
+    }
+  ]
+}

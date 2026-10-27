@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "k8s-rca-agent"
+version = "0.3.4"
+description = "Read-only Kubernetes fault detection & root-cause agent for a 5G core (GraphRAG-style reasoning over a live dependency graph)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Milind" }]
+
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "pydantic>=2.6",
+    "pydantic-settings>=2.2",
+    "networkx>=3.2",
+    "httpx>=0.27",
+    "python-dateutil>=2.9",
+]
+
+[project.optional-dependencies]
+# LangGraph reasoning + LLM ranking. The core runs fine in no-LLM extractive mode without these.
+llm = [
+    "langgraph>=0.2",
+    "langchain-core>=0.3",
+]
+# Live cluster access (Alertmanager/event watchers, kube queries).
+cluster = [
+    "kubernetes>=29.0",
+]
+# Interactive graph visualization (pyvis -> vis.js HTML).
+viz = [
+    "pyvis>=0.3.2",
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "pyvis>=0.3.2",
+]
+
+[project.scripts]
+rca-agent = "rca_agent.webhook.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

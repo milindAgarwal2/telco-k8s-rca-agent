@@ -1,0 +1,12 @@
+apiVersion: v2
+name: rca-agent
+description: Read-only Kubernetes fault detection & root-cause agent for a 5G core.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - observability
+  - root-cause
+  - 5g
+  - graphrag
+  - read-only

@@ -1,0 +1,88 @@
+"""Output schema: the incident report with ranked root-cause hypotheses."""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from enum import Enum
+from uuid import uuid4
+
+from pydantic import BaseModel, Field
+
+
+class Severity(str, Enum):
+    critical = "critical"
+    warning = "warning"
+    info = "info"
+
+
+class Citation(BaseModel):
+    """A pointer to the primary evidence behind a claim."""
+
+    kind: str  # "log" | "event" | "metric" | "runbook" | "graph" | "change"
+    source: str  # pod name, PromQL query, runbook page, etc.
+    detail: str = ""
+    timestamp: datetime | None = None
+
+
+class Evidence(BaseModel):
+    """One structured piece of evidence gathered deterministically."""
+
+    category: str  # "pod_status" | "event" | "log" | "metric" | "change" | "graph"
+    summary: str
+    resource: str | None = None
+    timestamp: datetime | None = None
+    citations: list[Citation] = Field(default_factory=list)
+
+
+class Hypothesis(BaseModel):
+    """A candidate root cause with a confidence score and an evidence chain."""
+
+    cause: str
+    # Human-readable chain, e.g.
+    # "SMF errors <- UPF unreachable <- UPF OOMKilled <- memory limit lowered".
+    evidence_chain: list[str] = Field(default_factory=list)
+    confidence: float = 0.0  # 0.0 - 1.0
+    supporting_evidence: list[Evidence] = Field(default_factory=list)
+    citations: list[Citation] = Field(default_factory=list)
+
+
+class IncidentReport(BaseModel):
+    """The agent's complete output for one detected fault."""
+
+    incident_id: str = Field(default_factory=lambda: uuid4().hex[:12])
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # Symptom: what fired, where, when.
+    symptom: str
+    affected_resource: str | None = None
+    namespace: str | None = None
+    severity: Severity = Severity.warning
+    detected_at: datetime | None = None
+
+    # Reasoning outputs.
+    hypotheses: list[Hypothesis] = Field(default_factory=list)
+    blast_radius: list[str] = Field(default_factory=list)
+    evidence: list[Evidence] = Field(default_factory=list)
+    suggested_next_steps: list[str] = Field(default_factory=list)
+
+    # Other incident_ids sharing this one's exact failure signature on a
+    # DIFFERENT resource within the correlation window (see
+    # ``detection/event_watcher.py::_correlate``). This is a deterministic
+    # pattern flag, NOT a claimed root cause — the graph has no NF-to-NF
+    # ``calls`` edges yet to name or verify a shared upstream dependency (see
+    # PLAN.md Known Issues), so this never changes a hypothesis's confidence
+    # or invents what the shared cause is. It exists so "12 pods failed
+    # identically at once" shows up as one linked pattern instead of 12
+    # unrelated-looking incidents.
+    related_incidents: list[str] = Field(default_factory=list)
+
+    # Provenance.
+    reasoning_mode: str = "extractive"
+
+    @property
+    def top_hypothesis(self) -> Hypothesis | None:
+        return self.hypotheses[0] if self.hypotheses else None
+
+    def ranked(self) -> IncidentReport:
+        """Return self with hypotheses sorted by confidence (desc)."""
+        self.hypotheses.sort(key=lambda h: h.confidence, reverse=True)
+        return self
