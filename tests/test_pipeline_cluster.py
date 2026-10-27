@@ -8,6 +8,11 @@ Two regression guards:
   * "probe-failure hypotheses" (0.3.2) — a pod that is Running but failing its
     readiness/liveness probe (no OOMKilled/CrashLoopBackOff) must itself rank
     as the top root cause instead of being invisible to the fault detector.
+  * "calls edges" (0.3.5) — a pod whose env var literally references another
+    Service, where that Service is unhealthy, must get an upstream-dependency
+    hypothesis naming it, cited with the exact env var/ConfigMap key that
+    produced the edge — not just a generic "pod failing health probe" guess
+    with no named cause (the eric-pc-sm-* outage's real gap).
 """
 from __future__ import annotations
 
@@ -133,3 +138,70 @@ def test_probe_failure_ranks_as_top_hypothesis_without_oom_or_crash():
     # No OOMKilled/CrashLoopBackOff signal was ever present for this pod.
     assert "OOMKilled" not in top.cause
     assert "CrashLoopBackOff" not in top.cause
+
+
+def _upstream_dependency_store():
+    """``eric-pc-sm-diameter-0`` (the alert target) references the
+    ``eric-pc-sm-target-database`` Service via a literal env var; that
+    service's own pod is CrashLoopBackOff. This is the shape of the real
+    eric-pc-sm-* outage, minus the part this agent still can't do (there was
+    no such env var on the real cluster, or this would have named the cause
+    then too)."""
+    caller = fk.pod(
+        "eric-pc-sm-diameter-0", node_name="worker-1", healthy=True,
+        owner_refs=[fk.owner("eric-pc-sm-diameter-rs")],
+        containers=[fk.container(env=[
+            fk.env_var("TARGET_DB_HOST", value="eric-pc-sm-target-database"),
+        ])],
+    )
+    dependency = fk.pod(
+        "eric-pc-sm-target-database-0", node_name="worker-1", healthy=False,
+        waiting_reason="CrashLoopBackOff",
+        owner_refs=[fk.owner("eric-pc-sm-target-database-rs")],
+        labels={"app.kubernetes.io/name": "eric-pc-sm-target-database"},
+    )
+    return {
+        "nodes": [fk.node("worker-1")],
+        "pods": [caller, dependency],
+        "events": [],
+        "logs": {},
+        "configmaps": [], "secrets": [], "pvcs": [],
+        "replicasets": [
+            fk.replicaset("eric-pc-sm-diameter-rs", "eric-pc-sm-diameter", replicas=1),
+            fk.replicaset("eric-pc-sm-target-database-rs", "eric-pc-sm-target-database",
+                          replicas=1),
+        ],
+        "deployments": [
+            fk.deployment("eric-pc-sm-diameter", replicas=1),
+            fk.deployment("eric-pc-sm-target-database", replicas=1),
+        ],
+        "services": [fk.service("eric-pc-sm-target-database",
+                                selector={"app.kubernetes.io/name":
+                                         "eric-pc-sm-target-database"})],
+    }
+
+
+def test_pipeline_names_the_real_upstream_dependency_via_calls_edge():
+    """Regression for the calls-edges feature (0.3.5): when a pod's env var
+    literally references another Service, and that service is unhealthy,
+    the report must name it as an upstream cause with a cited env-var
+    evidence — not just flag a correlation pattern or a generic guess."""
+    cfg = Settings(cluster_enabled=True, namespace="open5gs")
+    builder = GraphBuilder(cfg, kube_client=fk.FakeKubeClient(_upstream_dependency_store()))
+    pipeline = ExtractivePipeline(cfg, builder=builder)
+
+    alert = Alert(labels={"alertname": "DiameterErrors", "pod": "eric-pc-sm-diameter-0",
+                          "namespace": "open5gs", "severity": "critical"})
+    report = pipeline.run(alert)
+
+    upstream_hyps = [h for h in report.hypotheses
+                     if "service/eric-pc-sm-target-database" in h.cause]
+    assert upstream_hyps, (
+        f"expected an upstream-dependency hypothesis naming the DB service; "
+        f"got causes: {[h.cause for h in report.hypotheses]}"
+    )
+
+    graph_evidence = [e for e in report.evidence if e.category == "graph"
+                      and e.resource == "service/eric-pc-sm-target-database"]
+    assert graph_evidence, "expected graph evidence citing the unhealthy upstream service"
+    assert "env:TARGET_DB_HOST" in graph_evidence[0].citations[0].detail

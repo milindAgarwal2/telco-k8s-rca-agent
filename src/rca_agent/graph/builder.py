@@ -11,7 +11,22 @@ no traces, no static call map. The graph is the internal structure of the app:
       ^ managed_by   ReplicaSet ^ managed_by   pods
       pods --runs_on--> nodes
       pods --mounts--> configmaps / secrets / pvcs
-      Service --selects--> pods
+      Service --selects--> pods  [health rolled up from selected pods]
+      pods --calls--> services   (see ``_detect_calls_edges`` below)
+
+**``calls`` edges (0.3.5)** — real NF-to-NF topology needs either a maintained
+static service map (no authoritative source exists for this stack — guessing
+one would fabricate exactly the kind of unsupported claim this project exists
+to avoid) or OTel tracing (new infra, not something to stand up on someone
+else's cluster unasked). So instead we read the ONE grounded signal already
+available via get/list: a container's literal env var values, and the values
+of ConfigMaps it mounts or reads via ``envFrom``, scanned for a DNS-boundary
+match against another Service's name already in this graph. A pod configured
+with e.g. ``VAULT_ADDR=https://eric-cloud-native-backupless-key-management:8200``
+gets a cited ``calls`` edge to that Service; a pod with no such reference gets
+none. This never invents a dependency — absence of a match means absence of
+an edge, not a guess (see PLAN.md Known Issues for the full rationale and the
+cases this does and does not cover).
 
 When ``cluster_enabled`` is False (default) we return the demo graph so the rest
 of the system runs with no cluster.
@@ -19,6 +34,7 @@ of the system runs with no cluster.
 from __future__ import annotations
 
 import logging
+import re
 
 from rca_agent.config import Settings, get_settings
 from rca_agent.graph.dependency_graph import (
@@ -71,10 +87,16 @@ class GraphBuilder:
 
         self._add_nodes(g)                # cluster-scoped: nodes
         self._add_workloads(g, kube, ns, sel)
-        self._add_config_objects(g, kube, ns, sel)
-        self._add_pods(g, kube, ns, sel)  # pods + edges + pod health
+        cm_data = self._add_config_objects(g, kube, ns, sel)
+        # Service names are needed BEFORE _add_pods so env/ConfigMap values can
+        # be matched against them while scanning pods (see _detect_call_targets).
+        # _add_services (below) still does the real node/selects-edge creation;
+        # this is just a cheap name-only pre-pass.
+        service_names = self._list_service_names(kube, ns, sel)
+        self._add_pods(g, kube, ns, sel, cm_data, service_names)  # pods + edges + pod health
         self._add_services(g, kube, ns, sel)
         self._roll_up_workload_health(g)
+        self._roll_up_service_health(g)
 
         from rca_agent.graph.dependency_graph import _now
         g.last_rebuilt = _now()
@@ -121,13 +143,23 @@ class GraphBuilder:
             for owner in rs.metadata.owner_references or []:
                 g.upsert_edge(rs.metadata.name, owner.name, EdgeKind.managed_by)
 
-    def _add_config_objects(self, g, kube, ns, sel) -> None:
+    def _add_config_objects(self, g, kube, ns, sel) -> dict:
+        """Returns ``{configmap_name: {key: value}}`` for every ConfigMap
+        found — needed by ``_add_pods`` to resolve ``valueFrom.configMapKeyRef``
+        and to scan mounted ConfigMap data for service-name references (see
+        module docstring). Secret VALUES are deliberately never read/returned
+        here — only their existence (for ``mounts`` edges); scanning secret
+        payloads for hostnames isn't worth the sensitivity trade-off this
+        heuristic would add.
+        """
+        cm_data: dict[str, dict] = {}
         for cm in _safe_list(
             lambda **kw: kube.core.list_namespaced_config_map(ns, label_selector=sel, **kw),
             "configmaps",
         ):
             g.upsert_node(_cm_id(cm.metadata.name), NodeKind.configmap,
                           display=cm.metadata.name)
+            cm_data[cm.metadata.name] = dict(getattr(cm, "data", None) or {})
         for sec in _safe_list(
             lambda **kw: kube.core.list_namespaced_secret(ns, label_selector=sel, **kw),
             "secrets",
@@ -141,8 +173,21 @@ class GraphBuilder:
         ):
             g.upsert_node(_pvc_id(pvc.metadata.name), NodeKind.pvc,
                           display=pvc.metadata.name)
+        return cm_data
 
-    def _add_pods(self, g, kube, ns, sel) -> None:
+    def _list_service_names(self, kube, ns, sel) -> set[str]:
+        """Bare names of every Service in scope — the match set for
+        ``_detect_call_targets``. A cheap, name-only pre-pass; ``_add_services``
+        (below) still does the real node/selects-edge creation."""
+        return {
+            svc.metadata.name
+            for svc in _safe_list(
+                lambda **kw: kube.core.list_namespaced_service(ns, label_selector=sel, **kw),
+                "services",
+            )
+        }
+
+    def _add_pods(self, g, kube, ns, sel, cm_data: dict, service_names: set[str]) -> None:
         for pod in _safe_list(
             lambda **kw: kube.core.list_namespaced_pod(ns, label_selector=sel, **kw),
             "pods",
@@ -165,9 +210,11 @@ class GraphBuilder:
                 g.upsert_edge(name, owner.name, EdgeKind.managed_by)
 
             # mounts: volumes referencing configmaps / secrets / pvcs
+            mounted_configmaps: set[str] = set()
             for vol in getattr(pod.spec, "volumes", None) or []:
                 if getattr(vol, "config_map", None):
                     g.upsert_edge(name, _cm_id(vol.config_map.name), EdgeKind.mounts)
+                    mounted_configmaps.add(vol.config_map.name)
                 if getattr(vol, "secret", None):
                     sname = getattr(vol.secret, "secret_name", None)
                     if sname:
@@ -176,15 +223,45 @@ class GraphBuilder:
                 if pvc:
                     g.upsert_edge(name, _pvc_id(pvc.claim_name), EdgeKind.mounts)
 
-            # mounts via envFrom (configMapRef / secretRef) on containers
+            # mounts via envFrom (configMapRef / secretRef) on containers, PLUS
+            # calls edges detected from literal env var values / resolved
+            # configMapKeyRef values (see module docstring).
             for container in getattr(pod.spec, "containers", None) or []:
                 for env_from in getattr(container, "env_from", None) or []:
                     if getattr(env_from, "config_map_ref", None):
                         g.upsert_edge(name, _cm_id(env_from.config_map_ref.name),
                                       EdgeKind.mounts)
+                        mounted_configmaps.add(env_from.config_map_ref.name)
                     if getattr(env_from, "secret_ref", None):
                         g.upsert_edge(name, _secret_id(env_from.secret_ref.name),
                                       EdgeKind.mounts)
+
+                for env in getattr(container, "env", None) or []:
+                    env_name = getattr(env, "name", "?")
+                    value = getattr(env, "value", None)
+                    if value:
+                        _add_call_edges(g, name, value, service_names,
+                                        f"env:{env_name}")
+                        continue  # a literal value wins over valueFrom
+                    value_from = getattr(env, "value_from", None)
+                    cm_ref = getattr(value_from, "config_map_key_ref", None) \
+                        if value_from else None
+                    if cm_ref:
+                        resolved = cm_data.get(getattr(cm_ref, "name", None), {}).get(
+                            getattr(cm_ref, "key", None))
+                        if resolved:
+                            _add_call_edges(
+                                g, name, resolved, service_names,
+                                f"configmap:{cm_ref.name}.{cm_ref.key}",
+                            )
+
+            # calls edges from ANY key in a mounted ConfigMap's data (covers
+            # config consumed as a mounted file, e.g. a properties/yaml blob,
+            # not just an individually-referenced env var).
+            for cm_name in mounted_configmaps:
+                for key, value in cm_data.get(cm_name, {}).items():
+                    _add_call_edges(g, name, value, service_names,
+                                    f"configmap:{cm_name}.{key}")
 
     def _add_services(self, g, kube, ns, sel) -> None:
         for svc in _safe_list(
@@ -210,6 +287,17 @@ class GraphBuilder:
                 NodeKind.deployment.value, NodeKind.replicaset.value
             ):
                 g.roll_up_health(node_id)
+
+    def _roll_up_service_health(self, g: DependencyGraph) -> None:
+        """Roll up each Service's health from the pods it selects.
+
+        Without this, a Service node defaults to "healthy" regardless of the
+        pods behind it, which would make a ``calls`` edge TO a service
+        pointless for upstream-health reasoning (``unhealthy_upstream``).
+        """
+        for node_id in list(g.graph.nodes):
+            if g.graph.nodes[node_id].get("kind") == NodeKind.service.value:
+                g.roll_up_service_health(node_id)
 
 
 # ---------------------------------------------------------------------------
@@ -330,3 +418,59 @@ def _pvc_id(name: str) -> str:
 
 def _svc_id(name: str) -> str:
     return f"service/{name}"
+
+
+# ---------------------------------------------------------------------------
+# calls-edge detection (0.3.5) — see module docstring for the full rationale.
+# ---------------------------------------------------------------------------
+_MIN_MATCH_NAME_LEN = 4   # skip implausibly short/generic service names
+_BOUNDARY_RE_CACHE: dict[str, re.Pattern[str]] = {}
+
+
+def _boundary_re(name: str) -> re.Pattern[str]:
+    """A boundary-safe regex for ``name`` (cached per name), requiring ``name``
+    to be a COMPLETE identifier, not a prefix of a longer hyphenated one.
+
+    Matches ``name`` as a whole token: ``"foo-bar.default.svc.cluster.local"``
+    or ``"https://foo-bar:8200"`` match; ``"foo-barbaz"`` does not.
+
+    Plain ``\\b`` is NOT safe here: a hyphen counts as a word boundary, so
+    ``\\beric-cm-mediator\\b`` would also match inside
+    ``"eric-cm-mediator-tls-client-ca-secret"`` — a DIFFERENT, longer secret
+    name that merely starts with the same prefix (a real false positive found
+    testing against the Cobra cluster, where nearly every secret/configmap is
+    named ``<component>-<descriptor>-secret``). Requiring the character
+    immediately before/after the match to be neither alphanumeric nor a
+    hyphen treats ``name`` as a complete hyphen-delimited token, never a
+    prefix or suffix of a longer one.
+    """
+    pattern = _BOUNDARY_RE_CACHE.get(name)
+    if pattern is None:
+        pattern = re.compile(
+            r"(?<![A-Za-z0-9-])" + re.escape(name) + r"(?![A-Za-z0-9-])"
+        )
+        _BOUNDARY_RE_CACHE[name] = pattern
+    return pattern
+
+
+def _detect_call_targets(value: str, service_names: set[str]) -> set[str]:
+    """Which of ``service_names`` are referenced inside ``value`` as a whole
+    token. Grounded, literal text matching only — never a guess."""
+    if not value:
+        return set()
+    return {
+        svc for svc in service_names
+        if len(svc) >= _MIN_MATCH_NAME_LEN and _boundary_re(svc).search(value)
+    }
+
+
+def _add_call_edges(g: DependencyGraph, pod_name: str, value: str,
+                    service_names: set[str], evidence: str) -> None:
+    """Add a cited ``calls`` edge from ``pod_name`` to every service
+    referenced in ``value``, skipping an obvious self-reference (a pod
+    naming its OWN workload, e.g. a "my own address" env var — not a real
+    dependency)."""
+    for target in _detect_call_targets(value, service_names):
+        if pod_name.startswith(target + "-") or pod_name == target:
+            continue  # self-reference, not a dependency
+        g.upsert_edge(pod_name, _svc_id(target), EdgeKind.calls, evidence=evidence)

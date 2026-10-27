@@ -95,13 +95,19 @@ def graph_walk(state: ReasoningState, graph: DependencyGraph) -> ReasoningState:
     state.blast_radius = graph.downstream(res)
     for up in state.unhealthy_upstream:
         node = graph.node(up) or {}
+        # When `up` is a DIRECT calls-edge target (not a multi-hop one), cite
+        # exactly which env var / ConfigMap key produced the dependency
+        # (see graph/builder.py::_add_call_edges) instead of a generic
+        # "upstream of" label.
+        edge_evidence = graph.calls_edge_evidence(res, up)
+        detail = f"upstream of {res} (via {edge_evidence})" if edge_evidence \
+            else "upstream of " + res
         state.add_evidence(Evidence(
             category="graph",
             summary=f"Upstream dependency '{up}' is unhealthy "
                     f"({node.get('health_reason', 'unknown')})",
             resource=up,
-            citations=[Citation(kind="graph", source=up,
-                                detail="upstream of " + res)],
+            citations=[Citation(kind="graph", source=up, detail=detail)],
         ))
     if state.blast_radius:
         state.add_evidence(Evidence(

@@ -66,6 +66,24 @@ def pvc_volume(claim_name):
               persistent_volume_claim=NS(claim_name=claim_name))
 
 
+def container(name="app", image="app:1.0", env=None, env_from=None):
+    """A fake container spec entry, for ``calls``-edge detection tests."""
+    return NS(name=name, image=image, env=env or [], env_from=env_from or [])
+
+
+def env_var(name, value=None, config_map_name=None, config_map_key=None):
+    """A fake container env entry: a literal ``value``, or ``valueFrom`` a
+    ConfigMap key (pass ``config_map_name``/``config_map_key`` instead)."""
+    value_from = None
+    if config_map_key is not None:
+        value_from = NS(config_map_key_ref=NS(name=config_map_name, key=config_map_key))
+    return NS(name=name, value=value, value_from=value_from)
+
+
+def configmap_ref(name):
+    return NS(config_map_ref=NS(name=name), secret_ref=None)
+
+
 def _pod_template(images=None):
     containers = [NS(image=img) for img in (images or ["app:1.0"])]
     return NS(spec=NS(containers=containers))
@@ -85,9 +103,10 @@ def replicaset(name, deploy_name, replicas=1, created=None, images=None):
               status=NS(replicas=replicas))
 
 
-def configmap(name, modified=None):
+def configmap(name, modified=None, data=None):
     return NS(metadata=meta(name, managed_fields=[managed_field(modified)]
-                            if modified else None))
+                            if modified else None),
+              data=data or {})
 
 
 def secret(name, modified=None):

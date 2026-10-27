@@ -240,7 +240,7 @@ def _apply_correlation_note(report: IncidentReport,
         f"{_CORRELATION_NOTE_PREFIX}{len(report.related_incidents)} other resource(s) failed "
         f"identically within the correlation window: {', '.join(related_resources)}. "
         "This pattern suggests a shared root cause, but the graph has no direct "
-        "NF-to-NF dependency edge yet to confirm or name it — treat this as a "
+        "NF-to-NF dependency edge yet to confirm or name it - treat this as a "
         "signal to investigate shared dependencies by hand, not a verified cause."
     )
     report.suggested_next_steps.append(note)

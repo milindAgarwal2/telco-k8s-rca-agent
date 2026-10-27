@@ -144,6 +144,139 @@ def test_safe_list_falls_back_when_call_rejects_kwargs():
     assert [i.name for i in items] == ["x"]
 
 
+# ---------------------------------------------------------------------------
+# calls-edge detection (0.3.5) — grounded in literal env var / ConfigMap
+# values, never a fabricated service map. See graph/builder.py module
+# docstring and PLAN.md Known Issues for the full rationale.
+#
+# NB: service/workload names here are deliberately >= 4 chars (e.g.
+# "upf-app", "smf-app", not bare "upf"/"smf") to exercise the real
+# ``_MIN_MATCH_NAME_LEN`` guard the same way real (long, hyphenated)
+# cluster service names do — a 3-char name would be silently filtered by
+# that same guard and make these tests misleading.
+# ---------------------------------------------------------------------------
+def _two_app_store(caller_env=None, caller_env_from=None, dep_healthy=True, cm_data=None):
+    """``upf-app`` is the caller (one pod, custom containers); ``smf-app`` is
+    the dependency (one pod, whose health rolls up onto ``service/smf-app``)."""
+    caller_pod = fk.pod(
+        "upf-app-0", node_name="worker-1",
+        owner_refs=[fk.owner("upf-app-7c9", "ReplicaSet")],
+        containers=[fk.container(env=caller_env or [], env_from=caller_env_from or [])],
+        labels={"app": "upf-app"},
+    )
+    dep_pod = fk.pod(
+        "smf-app-0", node_name="worker-1", healthy=dep_healthy,
+        waiting_reason=None if dep_healthy else "CrashLoopBackOff",
+        owner_refs=[fk.owner("smf-app-rs", "ReplicaSet")],
+        labels={"app": "smf-app"},
+    )
+    return {
+        "nodes": [fk.node("worker-1")],
+        "deployments": [fk.deployment("upf-app", replicas=1),
+                        fk.deployment("smf-app", replicas=1)],
+        "replicasets": [fk.replicaset("upf-app-7c9", "upf-app", replicas=1),
+                        fk.replicaset("smf-app-rs", "smf-app", replicas=1)],
+        "configmaps": [fk.configmap("upf-app-config", data=cm_data or {})],
+        "secrets": [], "pvcs": [],
+        "services": [fk.service("upf-app", selector={"app": "upf-app"}),
+                     fk.service("smf-app", selector={"app": "smf-app"})],
+        "pods": [caller_pod, dep_pod],
+    }
+
+
+def test_calls_edge_from_literal_env_value_matching_a_service_name():
+    store = _two_app_store(caller_env=[fk.env_var("SMF_ADDR", value="smf-app")])
+    g = _build(store)
+    assert g.graph.has_edge("upf-app-0", "service/smf-app", key=EdgeKind.calls.value)
+    edge = g.graph.get_edge_data("upf-app-0", "service/smf-app", key=EdgeKind.calls.value)
+    assert edge["evidence"] == "env:SMF_ADDR"
+
+
+def test_calls_edge_not_created_for_substring_without_a_boundary():
+    """"smf-appbackup-host" contains "smf-app" but not as a whole token."""
+    store = _two_app_store(caller_env=[fk.env_var("NOISE", value="smf-appbackup-host")])
+    g = _build(store)
+    assert not g.graph.has_edge("upf-app-0", "service/smf-app", key=EdgeKind.calls.value)
+
+
+def test_calls_edge_not_created_when_service_name_is_a_prefix_of_a_longer_hyphenated_name():
+    """Real-cluster regression: a secret cert path like
+    "/run/secrets/smf-app-tls-client-ca-secret/ca.crt" CONTAINS the service
+    name "smf-app" followed by a hyphen — plain ``\\b`` treats a hyphen as a
+    word boundary and would wrongly match this as a reference to the
+    "smf-app" SERVICE, when it's actually the start of a different, longer
+    secret name ("smf-app-tls-client-ca-secret"). Found live: nearly every
+    pod in the real namespace mounts a `<component>-...-secret` path whose
+    prefix coincidentally matches an unrelated real service name, producing
+    false "calls" edges across almost the whole graph."""
+    store = _two_app_store(caller_env=[fk.env_var(
+        "CM_MEDIATOR_CA_CERT", value="/run/secrets/smf-app-tls-client-ca-secret/ca.crt")])
+    g = _build(store)
+    assert not g.graph.has_edge("upf-app-0", "service/smf-app", key=EdgeKind.calls.value)
+
+
+def test_calls_edge_matches_as_a_whole_dns_token():
+    """A realistic FQDN-shaped value still matches ("smf-app" bounded by dots)."""
+    store = _two_app_store(caller_env=[fk.env_var(
+        "SMF_URL", value="https://smf-app.open5gs.svc.cluster.local:8080")])
+    g = _build(store)
+    assert g.graph.has_edge("upf-app-0", "service/smf-app", key=EdgeKind.calls.value)
+
+
+def test_calls_edge_from_resolved_configmap_key_ref():
+    store = _two_app_store(
+        cm_data={"smf_host": "smf-app"},
+        caller_env=[fk.env_var("SMF_HOST", config_map_name="upf-app-config",
+                               config_map_key="smf_host")],
+    )
+    g = _build(store)
+    assert g.graph.has_edge("upf-app-0", "service/smf-app", key=EdgeKind.calls.value)
+    edge = g.graph.get_edge_data("upf-app-0", "service/smf-app", key=EdgeKind.calls.value)
+    assert edge["evidence"] == "configmap:upf-app-config.smf_host"
+
+
+def test_calls_edge_from_any_key_in_a_mounted_configmap():
+    """Covers config consumed as a mounted blob, not an individually
+    referenced env var — any key in a mounted ConfigMap's data is scanned."""
+    store = _two_app_store(cm_data={"endpoints.yaml": "upstream: smf-app:8080"},
+                           caller_env_from=[fk.configmap_ref("upf-app-config")])
+    g = _build(store)
+    assert g.graph.has_edge("upf-app-0", "service/smf-app", key=EdgeKind.calls.value)
+    edge = g.graph.get_edge_data("upf-app-0", "service/smf-app", key=EdgeKind.calls.value)
+    assert edge["evidence"] == "configmap:upf-app-config.endpoints.yaml"
+
+
+def test_calls_edge_self_reference_is_excluded():
+    """A pod naming its OWN workload (e.g. a "my address" env var) is not a
+    dependency on itself."""
+    store = _two_app_store(caller_env=[fk.env_var("SELF_HOST", value="upf-app")])
+    g = _build(store)
+    assert not g.graph.has_edge("upf-app-0", "service/upf-app", key=EdgeKind.calls.value)
+
+
+def test_service_health_rolls_up_from_selected_pods():
+    store = _two_app_store(dep_healthy=False)
+    g = _build(store)
+    assert g.node("service/smf-app")["health"] == Health.down.value
+
+
+def test_service_health_healthy_when_all_selected_pods_ready():
+    store = _two_app_store(dep_healthy=True)
+    g = _build(store)
+    assert g.node("service/smf-app")["health"] == Health.healthy.value
+
+
+def test_unhealthy_upstream_found_via_calls_edge_to_unhealthy_service():
+    """End-to-end: a real calls edge + a real service-health rollup lets
+    graph_walk's unhealthy_upstream() actually name the shared dependency —
+    the gap the real eric-pc-sm-* outage exposed (see PLAN.md)."""
+    store = _two_app_store(caller_env=[fk.env_var("SMF_ADDR", value="smf-app")],
+                           dep_healthy=False)
+    g = _build(store)
+    assert "service/smf-app" in g.unhealthy_upstream("upf-app-0")
+    assert g.calls_edge_evidence("upf-app-0", "service/smf-app") == "env:SMF_ADDR"
+
+
 def test_403_on_a_resource_is_non_fatal():
     """A 403 listing one resource type (e.g. cluster-scoped nodes) must not
     blank the whole graph — the rest of the build proceeds."""

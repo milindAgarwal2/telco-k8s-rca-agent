@@ -37,9 +37,34 @@ Stand up the environment and turn real cluster state into a graph.
 - ✅ **Graph build from cluster** (`graph/builder.py::_rebuild_from_cluster`):
   list pods/nodes/deployments/configmaps via the read-only client; build
   `runs_on`/`mounts`/`managed_by` from owner refs & volumes. Health from pod
-  phase + statuses. **Still missing: `calls` edges** (static service map or
-  OTel traces) — no NF-to-NF topology exists yet, so `graph_walk` can't find
-  upstream causes or blast radius for a dependency failure (see Known Issues).
+  phase + statuses.
+- 🟡 **`calls` edges (0.3.5)** — real NF-to-NF topology from a maintained
+  static service map or OTel tracing is still 🔲 (no authoritative source
+  exists for a static map — fabricating one would violate "everything is
+  cited"; OTel is new infra not to be stood up on someone else's cluster
+  unasked). What 0.3.5 *does* build: `_add_call_edges` in `graph/builder.py`
+  scans each pod's literal env var values and the ConfigMap data it mounts
+  or reads via `envFrom`/`configMapKeyRef`, for a DNS-boundary-safe match
+  against another Service's name already in the graph (e.g.
+  `VAULT_ADDR=https://eric-cloud-native-backupless-key-management:8200`
+  → a cited `calls` edge to that Service). Services also now get a real
+  health rollup (`roll_up_service_health`, from the pods they `select`) —
+  without it a `calls` edge to a service would be meaningless, since the
+  service node would always read as "healthy" by default. `graph_walk`
+  (`reasoning/steps.py`) cites the exact env var/ConfigMap key on the
+  resulting evidence. **This never invents a dependency** — a pod with no
+  such literal reference gets no edge, same evidence-only discipline as the
+  rest of the project. Covered by `tests/test_cluster_graph.py` (9 new
+  tests: edge creation, DNS-boundary safety, `configMapKeyRef` resolution,
+  mounted-ConfigMap-data scanning, self-reference exclusion, service health
+  rollup) and `tests/test_pipeline_cluster.py` (one end-to-end: an upstream
+  Service hypothesis with a cited env-var evidence, not a generic guess).
+  **Found and fixed along the way**: `DependencyGraph.upsert_node`'s
+  "node already exists" path never backfilled `kind` on a node that had
+  been implicitly auto-created by `add_edge` before anything explicitly
+  upserted it — a real latent bug the calls-edge work's build order exposed
+  (service nodes silently lost their `kind`, so the health-rollup loop
+  skipped them). Fixed with a `setdefault`.
 - ✅ **Read-only RBAC** Helm chart (get/list/watch only).
 
 **Exit**: an alert hits the webhook and the agent returns an evidence table +
@@ -125,6 +150,57 @@ should become automatic):
   (`EventWatcher.record_external_incident`), so correlation works across
   both. Compounds with the item below: there were no logs to extract a
   shared hostname from anyway, so this was the only grounded fix available.
+  **Validated on the real Cobra cluster, 2026-10-27**: all 12 `eric-pc-sm-*`
+  incidents came back with `related_count: 11`, `related_incidents` listing
+  the other 11 ids, and a correlation note naming all 11 sibling pods by
+  name — with each hypothesis's confidence left untouched at 0.50.
+  **Further progress in 0.3.5**: the "real fix" above — naming *which*
+  dependency is shared — now exists as a mechanism (`calls` edges from env
+  var / ConfigMap references, see Phase 1). Whether it actually fires on
+  THIS specific outage depends on whether the real `eric-pc-sm-*` pods
+  reference their shared dependency by name in an env var or ConfigMap —
+  unverified as of this writing (see "Testing 0.3.5" steps below). If they
+  do, the next time this fires, instead of (or alongside) the correlation
+  note, the top hypothesis should gain an `upstream:service/<name>` entry
+  citing the exact env var. If they don't (e.g. the dependency is reached
+  via a Secret-only reference, a hardcoded address, or service discovery
+  that never appears as literal text), correlation remains the only signal
+  — which is the honest, non-fabricated outcome, not a bug.
+  **First real-cluster data point, 2026-10-27**: for
+  `eric-pc-sm-sgw-session-7d89f7cd6b-25r4z`, no `service/*` hypothesis
+  appeared — still just the generic "failing health probe" one plus the
+  0.3.4 correlation note.
+  **Resolved, 2026-10-27**: checked `/graph/view/<pod>?radius=2` directly.
+  `sgw-session`/`smf-pgw-session`/`diameter` DO reference real dependencies
+  literally — `ERIC_PC_SM_DB_SERVICE_NAME=eric-pc-kvdb-rd-server`,
+  `ERIC_PC_SM_TARGET_DB_MASTER_SERVICE_NAME=eric-pc-sm-target-database-master-rd`,
+  `..._REPLICA_SERVICE_NAME=eric-pc-sm-target-database-replica-rd`,
+  `ERIC_PC_VGF_SERVICE_NAME=eric-pc-vpn-gateway-forwarder...` (referenced by
+  ALL THREE, including `diameter`, which has no DB reference) — and 0.3.5's
+  `calls` edges DID get built for all of these. But all four resolve to
+  **healthy** services (`eric-pc-kvdb-rd-server` 6/6, both target-database
+  services 1/1, `eric-pc-vpn-gateway-forwarder` 2/2) — so `unhealthy_upstream`
+  correctly finds nothing to report. **Even with the mechanism working and
+  real references found, this specific outage genuinely isn't a
+  "referenced dependency is down" cascade** — reinforces the earlier manual
+  conclusion (cm-mediator healthy, its cert valid for another ~100 years)
+  that the cause is internal to the 6 affected components, not an external
+  dependency.
+  **A real bug found in the same test, fixed in 0.3.6→0.3.7**: the dump also
+  showed calls edges from nearly every pod (including `diameter`, which has
+  no such literal env values) to `eric-cm-mediator`/`eric-sec-sip-tls`/
+  `eric-pm-server`/`eric-cm-yang-provider` — all false positives. Cause: the
+  boundary regex used `\b`, and a hyphen counts as a word boundary, so
+  `\beric-cm-mediator\b` also matched inside `eric-cm-mediator-tls-client-
+  ca-secret` — a DIFFERENT, longer secret name that merely starts with the
+  same prefix. Since this stack names nearly every secret/configmap
+  `<component>-<descriptor>-secret`, this fired constantly, polluting the
+  graph with calls edges across nearly the whole namespace. Fixed by
+  requiring the character immediately before/after the match to be neither
+  alphanumeric nor a hyphen (`_boundary_re` in `graph/builder.py`), so a
+  service name can only match as a COMPLETE hyphen-delimited token, never a
+  prefix/suffix of a longer one. New regression test:
+  `test_calls_edge_not_created_when_service_name_is_a_prefix_of_a_longer_hyphenated_name`.
 - 🔲 **Open — log-content root-cause extraction.** The reasoning pipeline
   fences and lists raw log lines as evidence but never parses them for a
   structural failure signal. Found 2026-10-27 testing the real
@@ -147,15 +223,25 @@ should become automatic):
   sidecar instead), so `oc logs`/our `tools.logs()` are both blind on them.
   Any log-pattern step is necessarily a partial fix, not a substitute for
   real `calls` edges.
-- ✅ **Fixed — mis-rendered non-ASCII character in `suggested_next_steps`.**
-  The new "no runbook source configured" note (added for the fix above) used
-  an em dash (`—`), which showed up as mojibake (`\udce2\udc80\udc94`) when
-  piped through `python3 -m json.tool` on the Cobra jumpserver's RHEL 8.8
-  shell (non-UTF-8 locale mis-decoding the UTF-8 bytes). Fixed by using a
-  plain ASCII `-` in that string (shipped in 0.3.3). A reminder that any
-  user-facing string returned over the webhook API should stay ASCII-only
-  until verified safe across target environments — not just the dev
-  machine's locale.
+- ✅ **Fixed (0.3.3, regressed once, fixed properly in 0.3.6) — non-ASCII
+  characters in `suggested_next_steps`.** The "no runbook source configured"
+  note used an em dash (`—`), which showed up as mojibake
+  (`\udce2\udc80\udc94`) when piped through `python3 -m json.tool` on the
+  Cobra jumpserver's RHEL 8.8 shell (non-UTF-8 locale mis-decoding the UTF-8
+  bytes). Fixed in 0.3.3 by using a plain ASCII `-`. **Then the exact same
+  bug reappeared independently in 0.3.4**: the new "Correlated: ..." note
+  (`detection/event_watcher.py::_apply_correlation_note`) used its own em
+  dash, written in the same session that fixed the first one, and wasn't
+  caught until the next real-cluster test. Patching one string at a time
+  doesn't work. Fixed in 0.3.6 by (a) a repo-wide grep for `—` outside
+  comments/docstrings to confirm no other live instance exists (the HTML
+  page title and `/graph/view` dropdown text also use em dashes but are
+  browser-rendered, not JSON — left as-is), and (b) a real regression test,
+  `tests/test_ascii_safety.py`, that recursively scans an actual serialized
+  `IncidentReport` (including the exact correlation-note code path) for any
+  character with `ord(c) > 127`. This is the systemic fix — it catches a
+  *third* non-ASCII character introduced anywhere in future reasoning or
+  detection output, not just these two specific strings.
 - 🔲 **Open — `oc get events` column-position scripting is fragile.** While
   testing the watcher's conservative filter, a one-liner using
   `awk '{print $2}'` against `oc get events` table output accidentally
@@ -164,6 +250,80 @@ should become automatic):
   value doesn't. Not a code bug — a reminder for any future runbook/tooling
   text in this repo: prefer `-o jsonpath='{.items[*].reason}'` over
   column-counting against `oc`/`kubectl` table output.
+
+---
+
+## Testing 0.3.5 on the real Cobra cluster
+
+The automated suite (`tests/test_cluster_graph.py`, `tests/test_pipeline_cluster.py`)
+proves the mechanism works against a fake client. These are the steps to
+confirm it says something real against the actual `eric-pc-sm-*` outage —
+run from the jumpserver (or via an SSH tunnel), after deploying 0.3.5.
+
+1. **Deploy** (same pattern as every prior version):
+   ```bash
+   scp dist/cobra-package-0.3.5/{rca-agent-0.3.5.tar.gz,rca-agent-0.3.5.tar.gz.sha256,deploy-cobra.sh} \
+       eagamil@10.242.70.7:~/
+   ssh eagamil@10.242.70.7
+   oc login https://api.cobra-2a-openshift.bete.ericy.com:6443 -u eagamil -p <password> --insecure-skip-tls-verify
+   chmod +x deploy-cobra.sh && ./deploy-cobra.sh
+   ```
+
+2. **Confirm `calls` edges actually got built.** This is the step that
+   answers the open question above — whether the real pods reference their
+   dependencies by name in env vars/ConfigMaps at all:
+   ```bash
+   curl -s http://10.242.70.7:8004/graph/view/eric-pc-sm-diameter-7bdcb67999-7tcd2?radius=2
+   ```
+   Open in a browser; look for any edge labeled `calls` leaving that pod. If
+   none exist, `0 calls edges built` is the honest (if less exciting)
+   outcome for this specific pod — check a few other `eric-pc-sm-*` pods too
+   (`ip-allocator`, `sgw-session`, `udp-forwarder`) since different
+   components may be configured differently.
+
+3. **Check the incident report for a NAMED upstream cause**, not just the
+   correlation note from 0.3.4:
+   ```bash
+   curl -s http://10.242.70.7:8004/incidents | python3 -c "
+   import json, sys
+   d = json.load(sys.stdin)
+   print([i['incident_id'] for i in d['incidents']][0:3])
+   "
+   # then, for one of those ids:
+   curl -s http://10.242.70.7:8004/incidents/<incident_id> | python3 -m json.tool
+   ```
+   Look specifically for a hypothesis whose `cause` starts with
+   `service/<something>` (not just `<pod> failing health probe`) — that's
+   the calls-edge feature naming an actual upstream dependency. Check its
+   `evidence_chain`/`supporting_evidence` for an `env:<VAR>` or
+   `configmap:<name>.<key>` citation.
+
+4. **If no `service/*` hypothesis appears anywhere**, that's useful
+   information, not a failure: it means the shared `eric-pc-sm-*` dependency
+   isn't referenced by name in any pod's env vars or ConfigMap data (common
+   if it's reached via a Secret, a hardcoded address, or app-level service
+   discovery). Confirm by hand what IS shared:
+   ```bash
+   oc get pod eric-pc-sm-diameter-7bdcb67999-7tcd2 \
+     -n plantx2avzwcspgc-y-oc-consp-301 -o jsonpath='{.spec.containers[0].env}' \
+     | python3 -m json.tool
+   ```
+   If the real dependency only shows up in a Secret, that's a deliberate
+   scope boundary of this feature (see Phase 1 above), not a bug — the next
+   step would be a conscious decision to also scan Secret values, trading
+   some of the "never touch anything sensitive" caution for more coverage.
+
+5. **Regression-check the rest of 0.3.4's behavior still holds** (the
+   correlation note should still appear alongside any new calls-edge
+   hypothesis, not replaced by it):
+   ```bash
+   curl -s http://10.242.70.7:8004/incidents/<incident_id> | python3 -c "
+   import json, sys
+   r = json.load(sys.stdin)
+   print('related_count via related_incidents:', len(r['related_incidents']))
+   print([s for s in r['suggested_next_steps'] if s.startswith('Correlated:')])
+   "
+   ```
 
 ---
 
