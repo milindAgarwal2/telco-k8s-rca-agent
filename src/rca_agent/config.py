@@ -86,8 +86,26 @@ class Settings(BaseSettings):
     prometheus_url: str | None = None
 
     # --- RAG runbook retriever ---
+    # Two SEPARATE, ADDITIVE sources (neither replaces the other):
+    #   runbook_rag_url    -> HttpRunbookRetriever, calling an external
+    #                         doc-intelligence service. Still 🔲 (not built) —
+    #                         for when network access to such a service is
+    #                         available. Setting this URL alone does nothing
+    #                         yet (see rag/runbook_retriever.py).
+    #   runbook_store_path -> LocalRunbookRetriever, over documents uploaded
+    #                         through the dashboard's Runbooks tab. Fully
+    #                         local, no network/LLM needed. Takes priority
+    #                         when documents have actually been uploaded.
     runbook_rag_url: str | None = None  # existing doc-intelligence service
     runbook_rag_top_k: int = 3
+    runbook_store_path: str = "/tmp/runbooks/store.json"
+
+    # --- Runbook query log ---
+    # Records every runbook-retrieval attempt (not LLM calls -- this project
+    # has no LLM call anywhere in the default extractive pipeline) so you can
+    # see what's being asked and whether anything matched. A "negative"
+    # entry is one with zero hits -- the signal for "write a runbook for this."
+    runbook_query_log_max_entries: int = 1000
 
     # --- LLM (only used when reasoning_mode == "llm") ---
     llm_provider: str = "none"

@@ -10,12 +10,16 @@ never invent a cause that has no gathered evidence.
 from __future__ import annotations
 
 from datetime import timedelta
+from typing import TYPE_CHECKING
 
 from rca_agent.graph.dependency_graph import DependencyGraph
 from rca_agent.models.incident import Citation, Evidence, Hypothesis
 from rca_agent.rag.runbook_retriever import RunbookRetriever
 from rca_agent.reasoning.state import ReasoningState
 from rca_agent.tools.query_tools import QueryTools
+
+if TYPE_CHECKING:
+    from rca_agent.rag.query_log import QueryLog
 
 
 def fence(text: str) -> str:
@@ -328,7 +332,7 @@ NO_RUNBOOK_SOURCE_NOTE = (
 
 
 def build_next_steps(state: ReasoningState, retriever: RunbookRetriever,
-                     top_k: int) -> ReasoningState:
+                     top_k: int, query_log: QueryLog | None = None) -> ReasoningState:
     """Pull human-facing next steps from runbooks via RAG (recommendations only).
 
     When the retriever finds nothing (most commonly ``NullRunbookRetriever``,
@@ -337,10 +341,16 @@ def build_next_steps(state: ReasoningState, retriever: RunbookRetriever,
     no guidance" when the real reason is "no runbook source is wired up". A
     single neutral note makes that distinction explicit instead of implying a
     finding that never happened.
+
+    Every attempt is recorded to ``query_log`` when one is given (the
+    dashboard's Query Log tab) — including zero-hit attempts, since those are
+    exactly the "nothing matched this" signal worth tracking.
     """
     top = state.hypotheses[0] if state.hypotheses else None
     query = top.cause if top else f"{state.alert.name} {state.affected_resource or ''}"
     hits = retriever.retrieve(query, top_k=top_k)
+    if query_log is not None:
+        query_log.record(query, type(retriever).__name__, [h.title for h in hits])
     if hits:
         state.suggested_next_steps = [
             f"{h.title}: {h.snippet} (see {h.source})" for h in hits

@@ -1,12 +1,17 @@
 """FastAPI application.
 
 Endpoints:
-  GET  /healthz            liveness
-  GET  /readyz             readiness (graph built)
-  GET  /graph/stats        current dependency-graph stats
-  GET  /incidents          auto-detected incidents (event watcher)
-  GET  /incidents/{id}     one auto-detected incident report in full
-  POST /webhook/alertmanager  Alertmanager v4 webhook -> incident report(s)
+  GET    /healthz            liveness
+  GET    /readyz             readiness (graph built)
+  GET    /graph/stats        current dependency-graph stats
+  GET    /incidents          auto-detected incidents (event watcher)
+  GET    /incidents/{id}     one auto-detected incident report in full
+  POST   /webhook/alertmanager  Alertmanager v4 webhook -> incident report(s)
+  POST   /runbooks           upload a runbook doc (.txt/.md/.pdf) for LocalRunbookRetriever
+  GET    /runbooks           list uploaded runbook docs
+  DELETE /runbooks/{name}    remove one uploaded runbook doc
+  GET    /runbook-queries    runbook-retrieval attempt log (what was asked, hit/miss)
+  DELETE /runbook-queries    clear the runbook-retrieval attempt log
 
 The app builds the dependency graph once at startup (demo graph with no cluster)
 and reuses it across requests. Each firing alert is reasoned about independently
@@ -20,8 +25,9 @@ import asyncio
 import contextlib
 import logging
 from contextlib import asynccontextmanager
+from dataclasses import asdict
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -31,6 +37,8 @@ from rca_agent.detection.event_watcher import EventWatcher
 from rca_agent.graph.builder import GraphBuilder
 from rca_agent.models.alert import AlertmanagerPayload
 from rca_agent.models.incident import IncidentReport
+from rca_agent.rag.local_store import extract_text, get_local_store
+from rca_agent.rag.query_log import get_query_log
 from rca_agent.reasoning.flow import ReasoningFlow
 
 logger = logging.getLogger("rca_agent")
@@ -67,6 +75,13 @@ _flow: ReasoningFlow = ReasoningFlow(settings, graph=_graph_builder.graph, build
 # every poll — ``_initial_build``/``_refresh_loop`` reassign it via ``global``
 # on each graph rebuild, so caching a reference here would go stale.
 _event_watcher = EventWatcher(settings, _graph_builder, flow_factory=lambda: _flow)
+
+# Shared with ExtractivePipeline via the same lru_cache-keyed args -- the
+# Runbooks/Query-Log endpoints below read/write the exact same singletons the
+# reasoning pipeline uses, so an upload through the dashboard is visible to
+# the next incident's retrieval immediately.
+_local_store = get_local_store(settings.runbook_store_path)
+_query_log = get_query_log(settings.runbook_query_log_max_entries)
 
 
 async def _refresh_loop() -> None:
@@ -177,29 +192,38 @@ def graph_neighborhood(node_id: str, radius: int = 1) -> dict:
 
 
 @app.get("/graph/view", response_class=HTMLResponse)
-def graph_view(hide_orphans: bool = True) -> HTMLResponse:
+def graph_view(hide_orphans: bool = True, with_pod_filter: bool = True) -> HTMLResponse:
     """Interactive HTML visualization of the full dependency graph.
 
     ``hide_orphans=true`` (default) drops edgeless nodes (unmounted
     secrets/configmaps). Pass ``?hide_orphans=false`` to see everything.
+    ``with_pod_filter=true`` (default) overlays this page's own pod picker;
+    pass ``?with_pod_filter=false`` when embedding this HTML inside another
+    UI (e.g. the Streamlit dashboard) that already provides its own selector,
+    so there's only one control driving which pod is shown.
     """
     from rca_agent.graph.visualize import render_graph_html
     html = render_graph_html(_graph_builder.graph,
                              title=f"{settings.app_name} — dependency graph",
-                             hide_orphans=hide_orphans)
+                             hide_orphans=hide_orphans,
+                             with_pod_filter=with_pod_filter)
     return HTMLResponse(content=html)
 
 
 @app.get("/graph/view/{node_id}", response_class=HTMLResponse)
 def graph_view_node(node_id: str, radius: int = 2,
-                    hide_orphans: bool = False) -> HTMLResponse:
-    """Interactive HTML visualization of one node's neighborhood."""
+                    hide_orphans: bool = False, with_pod_filter: bool = True) -> HTMLResponse:
+    """Interactive HTML visualization of one node's neighborhood.
+
+    See ``/graph/view`` for ``with_pod_filter``.
+    """
     from rca_agent.graph.visualize import render_neighborhood_html
     if not _graph_builder.graph.node(node_id):
         return HTMLResponse(content=f"<h3>Node '{node_id}' not found in graph.</h3>",
                             status_code=404)
     html = render_neighborhood_html(_graph_builder.graph, node_id, radius=radius,
-                                    hide_orphans=hide_orphans)
+                                    hide_orphans=hide_orphans,
+                                    with_pod_filter=with_pod_filter)
     return HTMLResponse(content=html)
 
 
@@ -254,6 +278,54 @@ def alertmanager_webhook(payload: AlertmanagerPayload) -> WebhookResponse:
     logger.info("processed %d/%d firing alerts", len(reports), len(payload.alerts))
     return WebhookResponse(received=len(payload.alerts),
                            processed=len(reports), reports=reports)
+
+
+@app.post("/runbooks")
+async def upload_runbook(file: UploadFile = File(...)) -> dict:  # noqa: B008
+    """Upload a runbook document (``.txt``/``.md``/``.pdf``) for
+    ``LocalRunbookRetriever``. Re-uploading the same filename replaces its
+    chunks (a safe overwrite, not a duplicate) -- see
+    ``LocalRunbookStore.add_document``.
+    """
+    content = await file.read()
+    name = file.filename or "runbook.txt"
+    try:
+        text = extract_text(name, content)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="no extractable text in uploaded file")
+    doc = _local_store.add_document(name, text)
+    return asdict(doc)
+
+
+@app.get("/runbooks")
+def list_runbooks() -> dict:
+    docs = _local_store.list_documents()
+    return {"count": len(docs), "documents": [asdict(d) for d in docs], "stats": _local_store.stats()}
+
+
+@app.delete("/runbooks/{name}")
+def delete_runbook(name: str) -> dict:
+    result = _local_store.delete_document(name)
+    if not result["deleted"]:
+        raise HTTPException(status_code=404, detail=f"runbook '{name}' not found")
+    return result
+
+
+@app.get("/runbook-queries")
+def list_runbook_queries(limit: int = 100) -> dict:
+    """The runbook-retrieval attempt log: what was asked, and whether
+    anything matched. A zero-``hit_count`` entry is the signal for "write a
+    runbook for this."
+    """
+    entries = _query_log.list_entries(limit=limit)
+    return {"stats": _query_log.stats(), "entries": [asdict(e) for e in entries]}
+
+
+@app.delete("/runbook-queries")
+def clear_runbook_queries() -> dict:
+    return {"cleared": _query_log.clear()}
 
 
 def main() -> None:

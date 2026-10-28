@@ -47,6 +47,8 @@ src/rca_agent/
   reasoning/               # LangGraph flow + extractive no-LLM fallback
   models/                  # incident report & alert schemas
   rag/                     # runbook retriever interface (existing doc pipeline)
+streamlit_app/             # Streamlit dashboard: Graph / Incidents / Health tabs
+docker/                    # entrypoint.sh (starts FastAPI + Streamlit) + Dockerfile support
 deploy/helm/               # Helm chart: read-only SA/ClusterRole, Deployment, Service
 tests/                     # unit tests
 PLAN.md                    # phase-by-phase roadmap (4 weekly phases)

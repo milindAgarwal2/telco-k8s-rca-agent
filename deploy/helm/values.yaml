@@ -1,6 +1,6 @@
 image:
   repository: rca-agent
-  tag: "0.3.7"
+  tag: "0.3.9"
   pullPolicy: IfNotPresent
 
 replicaCount: 1

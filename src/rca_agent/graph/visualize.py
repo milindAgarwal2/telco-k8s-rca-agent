@@ -7,7 +7,15 @@ lazily so the core service does not require it.
 """
 from __future__ import annotations
 
+import re
+
 from rca_agent.graph.dependency_graph import DependencyGraph, Health, NodeKind
+
+# pyvis's template unconditionally emits <center><h1>{{heading}}</h1></center>
+# TWICE regardless of whether `heading` is empty -- passing heading="" just
+# leaves two empty shells (<h1></h1>) rather than skipping the block. Strip
+# them entirely rather than leaving dead markup around.
+_EMPTY_HEADING_RE = re.compile(r"<center>\s*<h1>\s*</h1>\s*</center>\s*")
 
 # Node shape by kind (vis.js shapes).
 _SHAPE = {
@@ -182,8 +190,12 @@ def _render(graph: DependencyGraph, node_ids, title: str, height: str,
         wanted = set(node_ids)
         edges = [(u, v, k) for u, v, k in edges if u in wanted and v in wanted]
 
+    # No `heading=title` here on purpose: pyvis's own template renders that
+    # as a big centered <h1> TWICE (a template quirk, not a bug on our
+    # side), eating most of the viewport. A small fixed-position corner
+    # label (_title_label_html, injected below) replaces it.
     net = Network(height=height, width="100%", directed=True,
-                  bgcolor="#ffffff", font_color="#222222", heading=title)
+                  bgcolor="#ffffff", font_color="#222222", heading="")
 
     for nid in node_ids:
         attrs = dict(g.nodes[nid])
@@ -219,6 +231,7 @@ def _render(graph: DependencyGraph, node_ids, title: str, height: str,
     }
     """)
     html = net.generate_html(notebook=False)
+    html = _EMPTY_HEADING_RE.sub("", html)
 
     # Freeze physics once the initial stabilization finishes, so the layout
     # stops moving entirely. (vis.js emits 'stabilizationIterationsDone'.)
@@ -243,6 +256,15 @@ def _render(graph: DependencyGraph, node_ids, title: str, height: str,
     else:
         html += freeze_js
 
+    # Small fixed-position corner label replacing pyvis's own bulky duplicated
+    # <h1> heading (see the Network(heading="") comment above) -- top-right,
+    # away from the pod picker (top-left).
+    label_html = _title_label_html(title)
+    if "<body>" in html:
+        html = html.replace("<body>", "<body>" + label_html, 1)
+    else:
+        html = label_html + html
+
     # Inject the pod picker (if requested) right after <body> so it overlays
     # the graph canvas as a fixed control.
     if with_pod_filter:
@@ -252,3 +274,19 @@ def _render(graph: DependencyGraph, node_ids, title: str, height: str,
         else:
             html = filter_html + html
     return html
+
+
+def _title_label_html(title: str) -> str:
+    """A small, unobtrusive corner label naming what's shown -- replaces
+    pyvis's own ``heading`` output, which renders as a large centered <h1>
+    (twice, per its template) and eats most of the viewport."""
+    safe = title.replace("<", "&lt;").replace(">", "&gt;")
+    return f"""
+    <div style="position:fixed;top:10px;right:10px;z-index:999;
+         background:rgba(255,255,255,0.9);border:1px solid #ddd;border-radius:4px;
+         padding:4px 8px;font-family:sans-serif;font-size:12px;color:#555;
+         max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+         title="{safe}">
+      {safe}
+    </div>
+    """

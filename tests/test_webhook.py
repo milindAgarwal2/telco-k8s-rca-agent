@@ -76,6 +76,25 @@ def test_graph_view_node_neighborhood():
     assert "text/html" in r.headers["content-type"]
 
 
+def test_graph_view_with_pod_filter_false_omits_the_picker():
+    """The Streamlit dashboard embeds this HTML with its own pod selector,
+    so it asks for the page's built-in one to be omitted (one selector, not
+    two fighting over the same job)."""
+    with_filter = client.get("/graph/view").text
+    without_filter = client.get("/graph/view?with_pod_filter=false").text
+    assert 'id="pod-filter"' in with_filter
+    assert 'id="pod-filter"' not in without_filter
+
+
+def test_graph_view_node_has_no_bulky_duplicated_heading():
+    """pyvis renders a `heading=` as a big centered <h1> TWICE (a template
+    quirk, not something to reproduce) -- replaced by a small corner label
+    naming the same thing instead."""
+    r = client.get("/graph/view/upf?radius=2")
+    assert "<h1>" not in r.text
+    assert "Neighborhood of upf" in r.text  # still named, just not as an <h1>
+
+
 def test_graph_view_missing_node_404():
     r = client.get("/graph/view/nope-not-here")
     assert r.status_code == 404

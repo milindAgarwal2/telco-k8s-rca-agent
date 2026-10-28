@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "k8s-rca-agent"
-version = "0.3.7"
+version = "0.4.0"
 description = "Read-only Kubernetes fault detection & root-cause agent for a 5G core (GraphRAG-style reasoning over a live dependency graph)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -35,10 +35,25 @@ cluster = [
 viz = [
     "pyvis>=0.3.2",
 ]
+# The Streamlit dashboard (runs as a separate process, see docker/entrypoint.sh
+# and streamlit_app/dashboard.py). httpx is already a core dependency.
+ui = [
+    "streamlit>=1.38",
+]
+# Local runbook document storage/retrieval (the Runbooks dashboard tab).
+# pypdf is pure Python -- deliberately lighter than PyMuPDF/Spire.PDF.
+# python-multipart is required by FastAPI/Starlette to parse the file
+# upload's multipart form body (POST /runbooks).
+rag = [
+    "pypdf>=4.0",
+    "python-multipart>=0.0.9",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
     "pyvis>=0.3.2",
+    "pypdf>=4.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.scripts]

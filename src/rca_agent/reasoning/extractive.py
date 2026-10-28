@@ -11,6 +11,8 @@ from rca_agent.graph.builder import GraphBuilder
 from rca_agent.graph.dependency_graph import DependencyGraph
 from rca_agent.models.alert import Alert
 from rca_agent.models.incident import IncidentReport, Severity
+from rca_agent.rag.local_store import get_local_store
+from rca_agent.rag.query_log import get_query_log
 from rca_agent.rag.runbook_retriever import get_runbook_retriever
 from rca_agent.reasoning import steps
 from rca_agent.reasoning.state import ReasoningState
@@ -37,7 +39,7 @@ class ExtractivePipeline:
             kube_client=kube_client,
             prometheus_url=self.cfg.prometheus_url,
         )
-        self.retriever = get_runbook_retriever(self.cfg.runbook_rag_url)
+        self.query_log = get_query_log(self.cfg.runbook_query_log_max_entries)
 
     def run(self, alert: Alert) -> IncidentReport:
         ns = alert.namespace or self.cfg.namespace
@@ -49,7 +51,16 @@ class ExtractivePipeline:
         steps.graph_walk(state, self.graph)
         steps.change_correlation(state, self.tools, self.cfg, graph=self.graph)
         steps.hypothesize_and_rank(state)
-        steps.build_next_steps(state, self.retriever, self.cfg.runbook_rag_top_k)
+        # Resolved fresh per incident (not cached on self) so a runbook
+        # uploaded through the dashboard after startup takes effect on the
+        # very next incident, instead of staying frozen at whatever the
+        # retriever was at pipeline-construction time.
+        retriever = get_runbook_retriever(
+            self.cfg.runbook_rag_url,
+            local_store=get_local_store(self.cfg.runbook_store_path),
+        )
+        steps.build_next_steps(state, retriever, self.cfg.runbook_rag_top_k,
+                               query_log=self.query_log)
 
         return self._to_report(state)
 

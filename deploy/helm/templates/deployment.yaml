@@ -43,17 +43,35 @@ spec:
             readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
             capabilities:
               {{- toYaml .Values.securityContext.capabilities | nindent 14 }}
+          # Since 0.3.8: Streamlit is the only process bound to this port (the
+          # FastAPI backend is reached over a Unix socket, not a TCP port --
+          # see docker/entrypoint.sh) so /healthz and /readyz are no longer
+          # reachable here. Streamlit's own health endpoint is the only thing
+          # this probe can check now; it can't distinguish "FastAPI's graph
+          # build still running" from "ready" the way /readyz used to. This
+          # chart has never actually been exercised in-cluster yet (real
+          # testing so far has only been plain `docker run` on the Cobra
+          # jumpserver) -- fixed for correctness, not yet validated.
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /_stcore/health
               port: http
             initialDelaySeconds: 5
             periodSeconds: 15
           readinessProbe:
             httpGet:
-              path: /readyz
+              path: /_stcore/health
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        # Streamlit's config/cache and the FastAPI<->Streamlit Unix socket
+        # both live under /tmp -- needs to stay writable even though the
+        # root filesystem itself is read-only.
+        - name: tmp
+          emptyDir: {}

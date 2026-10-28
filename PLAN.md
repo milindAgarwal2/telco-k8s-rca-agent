@@ -92,11 +92,79 @@ Make the ranked output good, and wire the LLM as a re-ranker only.
 - 🔲 **LangGraph flow** (`reasoning/flow.py`): StateGraph of the same steps +
   a final LLM node that only *re-ranks & explains* existing hypotheses.
   Reject any cause not already evidence-backed. Untrusted text stays fenced.
-- 🔲 **Runbook RAG**: `HttpRunbookRetriever` against the existing
-  doc-intelligence service; populate suggested next steps + citations.
-- 🔲 **UI**: Streamlit incident list + report view; reuse the GraphRAG **Impact
-  Explorer** (`/graph/neighborhood/{node}`) to show the failing pod's
-  neighborhood with unhealthy nodes highlighted.
+- ✅ **Local runbook RAG (0.4.0)** / 🔲 **HTTP runbook RAG still unbuilt**:
+  two separate, additive sources feed `suggested_next_steps` — neither
+  replaces the other. `HttpRunbookRetriever` (against the existing external
+  doc-intelligence service) stays exactly as originally planned: still 🔲,
+  for whenever network access to that service is available. New in 0.4.0,
+  `LocalRunbookRetriever` (`rag/runbook_retriever.py`) retrieves from
+  documents uploaded through the dashboard's new **Runbooks** tab
+  (`rag/local_store.py`) — fully local, paragraph-chunked, rarity-weighted
+  (TF-IDF-style) keyword scoring, no embeddings/vector DB/LLM. Takes
+  priority over the Http branch once at least one document is uploaded; the
+  retriever is re-resolved fresh on every incident
+  (`ExtractivePipeline.run`), not cached at startup, so an upload takes
+  effect on the very next incident without a redeploy. A new **Query Log**
+  tab (`rag/query_log.py`) records every retrieval attempt (not LLM calls —
+  no LLM call exists anywhere in the extractive pipeline), including
+  zero-hit ("negative") ones, as the signal for which runbooks are missing.
+  Same in-memory-only limitation as the incident list: wiped on redeploy
+  until Postgres persistence (still 🔲) covers both.
+  **Bug found + fixed during 0.4.0 local testing** (via Streamlit's
+  `AppTest` harness against a real running backend, not yet the Cobra
+  cluster): the retriever was originally resolved once in
+  `ExtractivePipeline.__init__` and cached on `self` — so a runbook
+  uploaded through the dashboard AFTER the backend started never actually
+  took effect; every incident kept using whatever retriever existed at
+  startup (`NullRunbookRetriever`, since no docs existed yet). Confirmed via
+  a live repro: upload a doc, fire a webhook alert, see
+  `suggested_next_steps` still show the "no runbook source" note. Fixed by
+  resolving the retriever fresh inside `ExtractivePipeline.run()` on every
+  incident instead — re-verified with the same repro, now matching
+  immediately after upload, no redeploy needed.
+- 🟡 **UI (0.3.8, +0.4.0)**: a Streamlit dashboard (`streamlit_app/dashboard.py`)
+  with five tabs — **Graph** (the live dependency graph, embedded from the
+  existing `/graph/view(/{node})` HTML via `streamlit.components.v1.html`;
+  one pod/radius selector, driven from Streamlit — the embedded page's own
+  built-in picker is suppressed via the new `?with_pod_filter=false` query
+  param so there's only one control), **Incidents** (list + full report
+  detail: ranked hypotheses with confidence bars, evidence chain, citations,
+  correlation note, suggested next steps), **Runbooks** (new in 0.4.0 — the
+  Local runbook RAG admin GUI: upload/list/delete `.txt`/`.md`/`.pdf`
+  documents, styled after the sibling ChatBOT project's admin console),
+  **Query Log** (new in 0.4.0 — stats + filterable table + CSV export +
+  clear, styled after ChatBOT's Q&A History tab), **Health**
+  (`/healthz`/`/readyz`, version, raw `/graph/stats`). Reuses the existing
+  graph rendering
+  (`graph/visualize.py`) unchanged — no graph-drawing logic duplicated in
+  Streamlit.
+  **Deployment**: Streamlit is the ONLY externally-published process — it
+  binds `$RCA_PORT` directly, same single port as before
+  (`docker/entrypoint.sh`). FastAPI runs as an internal backend reached over
+  a **Unix domain socket** (`/tmp/rca-agent.sock`), deliberately NOT a TCP
+  port: this image runs with `--network host` (see `deploy-cobra.sh`), which
+  shares the host's network namespace, so a "127.0.0.1-only" port would
+  still be reachable by every other process on that shared jumpserver, not
+  just this container. A UDS is a filesystem path inside this container's
+  own namespace, which `--network host` does not share — so the published
+  port is the only way in, from anywhere, same-host or not. Validated
+  locally (not yet on the real Cobra cluster): image builds, both processes
+  start, exactly one TCP port is in `LISTEN` state (confirmed via
+  `/proc/net/tcp`), and the dashboard's own backend calls over the socket
+  return correct data (`/graph/stats`, `/graph/pods`,
+  `/graph/view?with_pod_filter=false`).
+  Still not literally "reusing the Impact Explorer" as its own React-ish
+  component — it's an iframe embed of the same rendered HTML, which is a
+  simpler, lower-maintenance substitution for the same user-facing result.
+  **Fixed in 0.3.9** (found testing the Graph tab on the real Cobra
+  cluster): pyvis's own template renders a passed `heading=` as a big
+  centered `<h1>` **twice** (a template quirk — it emits the block
+  unconditionally, just leaves it empty if `heading=""`), which ate most of
+  the viewport for a long pod name. `graph/visualize.py` now passes
+  `heading=""` and strips the resulting empty `<center><h1></h1></center>`
+  shells via regex, replacing them with a small fixed-position corner
+  label (`_title_label_html`) that still names what's shown, just not as a
+  giant duplicated headline.
 
 **Exit**: ranked root causes with evidence chains and runbook next-steps, in
 both extractive and LLM modes, viewable in the UI.
