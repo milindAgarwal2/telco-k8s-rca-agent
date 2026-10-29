@@ -122,22 +122,31 @@ Make the ranked output good, and wire the LLM as a re-ranker only.
   resolving the retriever fresh inside `ExtractivePipeline.run()` on every
   incident instead — re-verified with the same repro, now matching
   immediately after upload, no redeploy needed.
-- 🟡 **UI (0.3.8, +0.4.0)**: a Streamlit dashboard (`streamlit_app/dashboard.py`)
-  with five tabs — **Graph** (the live dependency graph, embedded from the
-  existing `/graph/view(/{node})` HTML via `streamlit.components.v1.html`;
-  one pod/radius selector, driven from Streamlit — the embedded page's own
-  built-in picker is suppressed via the new `?with_pod_filter=false` query
-  param so there's only one control), **Incidents** (list + full report
-  detail: ranked hypotheses with confidence bars, evidence chain, citations,
-  correlation note, suggested next steps), **Runbooks** (new in 0.4.0 — the
-  Local runbook RAG admin GUI: upload/list/delete `.txt`/`.md`/`.pdf`
-  documents, styled after the sibling ChatBOT project's admin console),
-  **Query Log** (new in 0.4.0 — stats + filterable table + CSV export +
-  clear, styled after ChatBOT's Q&A History tab), **Health**
-  (`/healthz`/`/readyz`, version, raw `/graph/stats`). Reuses the existing
-  graph rendering
-  (`graph/visualize.py`) unchanged — no graph-drawing logic duplicated in
-  Streamlit.
+- 🟡 **UI (0.3.8–0.4.0 Streamlit; rewritten server-rendered in 0.5.0)**: a
+  dashboard with five tabs — **Graph** (the live dependency graph, embedded
+  from the existing `/graph/view(/{node})` HTML in an `<iframe>`; one
+  pod/radius selector, with the embedded page's own picker suppressed via
+  `?with_pod_filter=false`), **Incidents** (list + full report detail: ranked
+  hypotheses with confidence bars, evidence chain, citations, correlation
+  note, suggested next steps), **Runbooks** (Local runbook RAG admin GUI:
+  upload/list/delete `.txt`/`.md`/`.pdf`), **Query Log** (stats + filterable
+  table + CSV export + clear), **Health** (`/healthz`/`/readyz`, version, raw
+  `/graph/stats`). Reuses the existing graph rendering
+  (`graph/visualize.py`) unchanged.
+  **0.5.0 change — dropped Streamlit entirely.** The dashboard is now
+  server-rendered HTML (FastAPI + Jinja2 + vendored Bootstrap/HTMX in
+  `webhook/templates/` + `webhook/static/`, `webhook/ui.py`) running in the
+  SAME uvicorn process as the API — reading the shared in-process objects
+  directly, no HTTP round-trip. This removed the ~440 MB
+  streamlit/pyarrow/pandas dependency stack: the packaged image went from
+  **216 MB → 89 MB** (docker-save|gzip), back to the pre-0.3.8 baseline (see
+  `PLAN-image-size.md`). Consequences: the two-process Unix-socket split is
+  gone (one process, one TCP port), so `/healthz` and `/readyz` are directly
+  reachable again (Helm probes + `deploy-cobra.sh` health check restored to
+  `/healthz`). Verified locally: image builds, all five tabs + static assets
+  return 200 in the running container, streamlit/pyarrow/pandas confirmed
+  absent, 98/98 tests pass, ruff clean. Not yet validated on the real Cobra
+  cluster.
   **Deployment**: Streamlit is the ONLY externally-published process — it
   binds `$RCA_PORT` directly, same single port as before
   (`docker/entrypoint.sh`). FastAPI runs as an internal backend reached over
