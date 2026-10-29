@@ -1,13 +1,12 @@
-"""LangGraph reasoning flow.
+"""Reasoning flow entry point.
 
-Wires the same deterministic steps as graph nodes, then adds an LLM re-rank /
-explain node at the end. If LangGraph (the ``[llm]`` extra) is not installed, or
-reasoning_mode != "llm", we transparently fall back to the extractive pipeline
-so the service always works.
-
-The LLM is constrained to RANK and EXPLAIN the rule-gathered hypotheses; it is
-never given a tool to query the cluster and cannot introduce a cause that lacks
-supporting evidence.
+Runs the deterministic extractive pipeline, then — when ``reasoning_mode == 'llm'``
+— asks a LOCAL llama.cpp sidecar to re-rank and explain the rule-gathered
+hypotheses. The LLM is constrained to REORDER + EXPLAIN existing, evidence-backed
+hypotheses; it is never given a tool to query the cluster and cannot introduce a
+cause that lacks supporting evidence (see reasoning/llm_rerank.py guardrails).
+Any LLM error/unavailable sidecar falls back transparently to the extractive
+order, so the service always works and extractive stays the reproducible default.
 """
 from __future__ import annotations
 
@@ -18,16 +17,8 @@ from rca_agent.models.incident import IncidentReport
 from rca_agent.reasoning.extractive import ExtractivePipeline
 
 
-def _langgraph_available() -> bool:
-    try:
-        import langgraph  # noqa: F401
-        return True
-    except ImportError:
-        return False
-
-
 class ReasoningFlow:
-    """Entry point used by the webhook. Chooses LLM or extractive mode."""
+    """Entry point used by the webhook. Chooses LLM-rerank or extractive mode."""
 
     def __init__(self, settings: Settings | None = None,
                  graph: DependencyGraph | None = None,
@@ -37,32 +28,16 @@ class ReasoningFlow:
 
     def run(self, alert: Alert) -> IncidentReport:
         report = self._extractive.run(alert)
-        if self.cfg.reasoning_mode == "llm" and _langgraph_available():
+        if self.cfg.reasoning_mode == "llm":
             report = self._llm_rerank(report)
         return report
 
     def _llm_rerank(self, report: IncidentReport) -> IncidentReport:
-        """Re-rank/explain the extractive hypotheses with an LLM.
+        """Re-rank/explain the extractive hypotheses via the local LLM sidecar.
 
-        TODO (Phase 2): build a LangGraph StateGraph whose final node calls the
-        configured LLM with the structured evidence (untrusted text fenced) and
-        asks it to order the existing hypotheses and write the evidence chain in
-        prose. Must reject any hypothesis not already present. For now this is a
-        pass-through so behavior is identical to extractive mode.
+        Delegates to ``reasoning.llm_rerank.llm_rerank``, which enforces the
+        guardrails (reorder + explain only, reject unknown ids, fence untrusted
+        evidence) and falls back to the extractive order on any failure.
         """
-        report.reasoning_mode = "llm (rerank pending Phase 2)"
-        return report
-
-
-def build_langgraph_app(settings: Settings | None = None):
-    """Construct the compiled LangGraph app (only when the extra is installed).
-
-    Returns None when LangGraph is unavailable so callers can fall back. The
-    ``settings`` argument is reserved for Phase 2 (LLM provider wiring).
-    """
-    if not _langgraph_available():
-        return None  # noqa: RET501 — explicit sentinel; Phase 2 returns a compiled app
-    # TODO (Phase 2): assemble StateGraph nodes using `settings`:
-    #   triage -> gather -> graph_walk -> change_correlation
-    #           -> hypothesize_rank -> llm_explain -> report
-    return None  # noqa: RET501 — explicit sentinel; Phase 2 returns a compiled app
+        from rca_agent.reasoning.llm_rerank import llm_rerank
+        return llm_rerank(report, self.cfg)

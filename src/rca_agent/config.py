@@ -124,8 +124,22 @@ class Settings(BaseSettings):
     runbook_query_log_max_entries: int = 1000
 
     # --- LLM (only used when reasoning_mode == "llm") ---
+    # The LLM ONLY re-ranks & explains the rule-gathered hypotheses; it can
+    # never invent a cause. It runs as a LOCAL llama.cpp server SIDECAR (no
+    # internet, no public IP) serving a GGUF model (e.g. the Qwen2.5-1.5B GGUF
+    # reused from ChatBOT). The agent reaches it over LOOPBACK only. On any
+    # error/timeout/unavailable, reasoning transparently falls back to the
+    # deterministic extractive order -- so enabling the LLM can never break or
+    # change WHICH causes exist, only their order + a short explanation.
     llm_provider: str = "none"
-    llm_model: str | None = None
+    llm_model: str = "qwen2.5-1.5b-instruct"
+    # Loopback base URL of the llama.cpp sidecar (OpenAI-compatible API).
+    # 127.0.0.1 (NOT 0.0.0.0) matters on the --network host jumpserver so the
+    # endpoint is not reachable by other users on that shared box.
+    llm_base_url: str = "http://127.0.0.1:8090"
+    llm_timeout_seconds: float = 30.0
+    llm_max_tokens: int = 512
+    llm_temperature: float = 0.1
 
     # --- Incident capture (for offline precision/recall labeling later) ---
     # When a path is set, every incident (auto-detected OR webhook-posted) is

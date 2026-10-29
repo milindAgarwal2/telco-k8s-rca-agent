@@ -34,3 +34,8 @@ incident_reports/
 
 # Office temp/lock files
 ~$*
+
+# LLM model files — fetched/copied separately, NEVER committed (would bloat history)
+*.gguf
+*.bin
+models/

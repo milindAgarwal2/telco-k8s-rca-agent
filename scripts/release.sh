@@ -24,7 +24,7 @@ IMAGE_NAME="${IMAGE_NAME:-rca-agent}"
 SCP_DEST="${SCP_DEST:-eagamil@10.242.70.7:~/}"
 PY="${PY:-.venv/bin/python}"
 
-DO_SCP=0; SKIP_TESTS=0; DO_BUILD=1; BUMP=1
+DO_SCP=0; SKIP_TESTS=0; DO_BUILD=1; BUMP=1; DO_SIDECAR=0
 VERSION=""
 
 for arg in "$@"; do
@@ -32,6 +32,7 @@ for arg in "$@"; do
     --scp)        DO_SCP=1 ;;
     --skip-tests) SKIP_TESTS=1 ;;
     --no-build)   DO_BUILD=0 ;;
+    --with-sidecar) DO_SIDECAR=1 ;;
     --no-bump)    BUMP=0 ;;
     -h|--help)    sed -n '2,24p' "$0"; exit 0 ;;
     -*)           echo "unknown flag: $arg" >&2; exit 2 ;;
@@ -93,15 +94,33 @@ docker save "$IMAGE_REF" | gzip > "$TARBALL"
 ( cd "$PKG_DIR" && sha256sum "$(basename "$TARBALL")" > "$(basename "$TARBALL").sha256" )
 
 # Carry forward the deploy script from the most recent prior package, bumping
-# its default IMAGE_TAG to this version.
+# its default IMAGE_TAG to this version. Prefer the CANONICAL source in
+# docker/deploy-cobra.sh; fall back to the most recent prior package.
+CANON_DEPLOY="docker/deploy-cobra.sh"
 PREV_DEPLOY="$(ls -1 dist/cobra-package-*/deploy-cobra.sh 2>/dev/null | sort -V | tail -1 || true)"
-if [ -n "$PREV_DEPLOY" ] && [ "$PREV_DEPLOY" != "$PKG_DIR/deploy-cobra.sh" ]; then
-  cp "$PREV_DEPLOY" "$PKG_DIR/deploy-cobra.sh"
+SRC_DEPLOY=""
+[ -f "$CANON_DEPLOY" ] && SRC_DEPLOY="$CANON_DEPLOY"
+[ -z "$SRC_DEPLOY" ] && [ -n "$PREV_DEPLOY" ] && SRC_DEPLOY="$PREV_DEPLOY"
+if [ -n "$SRC_DEPLOY" ]; then
+  cp "$SRC_DEPLOY" "$PKG_DIR/deploy-cobra.sh"
   sed -i -E "s/IMAGE_TAG:-[0-9]+\.[0-9]+\.[0-9]+/IMAGE_TAG:-${VERSION}/" "$PKG_DIR/deploy-cobra.sh"
   chmod +x "$PKG_DIR/deploy-cobra.sh"
-  log "deploy-cobra.sh copied + IMAGE_TAG default set to $VERSION"
+  log "deploy-cobra.sh from $SRC_DEPLOY (IMAGE_TAG default -> $VERSION)"
 else
-  log "WARN: no prior deploy-cobra.sh found to carry forward; add one to $PKG_DIR manually."
+  log "WARN: no deploy-cobra.sh source found; add one to $PKG_DIR manually."
+fi
+
+# Optional: build + package the LLM sidecar image too (--with-sidecar).
+if [ "$DO_SIDECAR" -eq 1 ]; then
+  SIDECAR_REF="${IMAGE_NAME}-sidecar:${VERSION}"
+  log "building sidecar image $SIDECAR_REF ..."
+  docker build -f docker/Dockerfile.sidecar -t "$SIDECAR_REF" . >/dev/null \
+    || die "sidecar docker build failed."
+  SC_TARBALL="$PKG_DIR/${IMAGE_NAME}-sidecar-${VERSION}.tar.gz"
+  log "saving sidecar image -> $SC_TARBALL ..."
+  docker save "$SIDECAR_REF" | gzip > "$SC_TARBALL"
+  ( cd "$PKG_DIR" && sha256sum "$(basename "$SC_TARBALL")" > "$(basename "$SC_TARBALL").sha256" )
+  log "sidecar packaged. Remember to scp the GGUF to the jumpserver once."
 fi
 
 log "package ready: $PKG_DIR"

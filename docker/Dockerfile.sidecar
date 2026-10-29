@@ -1,0 +1,32 @@
+# Sidecar: local llama.cpp server (OpenAI-compatible) for the LLM rerank node.
+#
+# Option A: the GGUF model is NOT baked in — it is mounted as a read-only volume
+# at /models/model.gguf at runtime (see deploy-cobra.sh). This keeps the image
+# small and lets the same image serve any GGUF.
+#
+# Serves the OpenAI-compatible API (/v1/chat/completions) via
+# `python -m llama_cpp.server`. The agent calls it over LOOPBACK only.
+FROM python:3.12-slim
+
+# Build toolchain for llama-cpp-python's native extension, then install the
+# server extra. Kept in one layer and cleaned up to limit image size.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential cmake git \
+    && pip install --no-cache-dir "llama-cpp-python[server]==0.3.36" \
+    && apt-get purge -y build-essential cmake git \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Non-root.
+RUN useradd -u 10002 -r -s /usr/sbin/nologin llm
+USER 10002
+
+# Model is mounted here read-only at runtime.
+ENV MODEL_PATH=/models/model.gguf \
+    LLM_HOST=127.0.0.1 \
+    LLM_PORT=8090 \
+    LLM_CTX=4096
+
+# Bind LOOPBACK by default (safe on a --network host jumpserver). Override
+# LLM_HOST=0.0.0.0 only inside a real pod where the port is pod-private.
+CMD ["sh", "-c", "python -m llama_cpp.server --model \"$MODEL_PATH\" --host \"$LLM_HOST\" --port \"$LLM_PORT\" --n_ctx \"$LLM_CTX\" --chat_format qwen"]
