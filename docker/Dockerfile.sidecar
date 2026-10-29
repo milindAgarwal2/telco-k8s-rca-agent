@@ -8,6 +8,14 @@
 # `python -m llama_cpp.server`. The agent calls it over LOOPBACK only.
 FROM python:3.12-slim
 
+# CPU target: the build host (laptop) is NEWER than the deploy host (Cobra
+# jumpserver = Xeon E5-2697 v4 "Broadwell"). Building with -march=native baked
+# in instructions Broadwell lacks (e.g. AVX-512) -> "Illegal instruction" crash
+# at runtime. DISABLE native tuning and enable only what Broadwell supports
+# (AVX, AVX2, FMA, F16C) for a build portable to that host yet still fast.
+# (For an even older target CPU, set all of these OFF.)
+ENV CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON -DGGML_AVX512=OFF"
+
 # Build toolchain for llama-cpp-python's native extension, then install the
 # server extra, then purge the toolchain to shrink the image. IMPORTANT:
 # libllama.so links against the OpenMP runtime (libgomp1) at RUNTIME, so it is
