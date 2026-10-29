@@ -9,9 +9,14 @@
 FROM python:3.12-slim
 
 # Build toolchain for llama-cpp-python's native extension, then install the
-# server extra. Kept in one layer and cleaned up to limit image size.
+# server extra, then purge the toolchain to shrink the image. IMPORTANT:
+# libllama.so links against the OpenMP runtime (libgomp1) at RUNTIME, so it is
+# installed as a SEPARATE kept package and marked manual, or autoremove would
+# drop it with gcc and the server would fail to load the shared library.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential cmake git \
+    && apt-get install -y --no-install-recommends libgomp1 \
+    && apt-mark manual libgomp1 \
     && pip install --no-cache-dir "llama-cpp-python[server]==0.3.36" \
     && apt-get purge -y build-essential cmake git \
     && apt-get autoremove -y \
