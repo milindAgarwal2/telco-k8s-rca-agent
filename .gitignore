@@ -31,3 +31,6 @@ htmlcov/
 *.log
 graph_snapshots/
 incident_reports/
+
+# Office temp/lock files
+~$*

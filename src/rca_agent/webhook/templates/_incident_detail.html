@@ -38,6 +38,29 @@
 </div>
 {% endif %}
 
+{% if d.hypotheses %}
+  {% set top = d.hypotheses[0] %}
+  {% if (top.cause or "").startswith("recent ") %}
+    {# Elevate a change-correlated root cause so it isn't lost in the list.
+       Pull the change citation (actor/time/detail) for the callout. #}
+    {% set change_cite = (top.citations | selectattr("kind", "equalto", "change") | list | first) %}
+    <div class="alert alert-warning py-2 px-3 mb-3">
+      <div class="fw-semibold small">⚡ Likely triggering change</div>
+      <div class="small">{{ top.cause }}</div>
+      {% if change_cite %}
+        <div class="small text-secondary mt-1">
+          {% if change_cite.detail %}{{ change_cite.detail }}{% endif %}
+          {% if change_cite.actor %}
+            · {% if change_cite.is_automation %}🤖{% elif change_cite.is_automation == false %}👤{% else %}❓{% endif %}
+            {{ change_cite.actor }}{% if change_cite.actor_source %} ({{ change_cite.actor_source }}){% endif %}
+          {% endif %}
+          {% if change_cite.timestamp %}· 🕒 {{ (change_cite.timestamp|string)[:19] }}{% endif %}
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endif %}
+
 <div class="fw-semibold small text-uppercase text-secondary mb-2">Ranked hypotheses</div>
 {% for h in d.hypotheses %}
   {% set conf = h.confidence or 0 %}
@@ -73,10 +96,12 @@
 <div class="row g-2">
   <div class="col-md-6">
     <div class="border rounded-3 p-2 h-100">
-      <div class="small fw-semibold mb-1">⬆️ Upstream — possible causes</div>
+      <div class="small fw-semibold mb-1">⬆️ Upstream dependencies (unhealthy)</div>
       <div class="small text-secondary mb-2" style="font-size:.75rem;">
-        Things <code>{{ d.affected_resource }}</code> depends on that are
-        themselves unhealthy (a failure here could be the root cause).
+        Services <code>{{ d.affected_resource }}</code> depends on (calls) that
+        are themselves unhealthy — a cascade source. (The ranked hypotheses
+        above are the overall root-cause list; this panel is only graph
+        dependencies.)
       </div>
       {% if d.upstream_unhealthy %}
         {% for up in d.upstream_unhealthy %}
