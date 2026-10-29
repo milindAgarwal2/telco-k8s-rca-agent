@@ -17,17 +17,38 @@ from rca_agent.graph.dependency_graph import DependencyGraph, Health, NodeKind
 # them entirely rather than leaving dead markup around.
 _EMPTY_HEADING_RE = re.compile(r"<center>\s*<h1>\s*</h1>\s*</center>\s*")
 
-# Node shape by kind (vis.js shapes).
+# Node shape by kind (vis.js shapes) -- every kind is a DISTINCT shape so the
+# shape alone identifies the kind (color is reserved for health, see below).
 _SHAPE = {
-    NodeKind.nf.value: "hexagon",
+    NodeKind.nf.value: "star",
     NodeKind.service.value: "diamond",
     NodeKind.pod.value: "dot",
     NodeKind.node.value: "square",
     NodeKind.deployment.value: "triangle",
     NodeKind.replicaset.value: "triangleDown",
     NodeKind.configmap.value: "box",
-    NodeKind.secret.value: "box",
-    NodeKind.pvc.value: "database",
+    NodeKind.secret.value: "database",
+    NodeKind.pvc.value: "hexagon",
+}
+
+# Human labels for the legend.
+_KIND_LABEL = {
+    NodeKind.nf.value: "network function",
+    NodeKind.service.value: "service",
+    NodeKind.pod.value: "pod",
+    NodeKind.node.value: "worker node",
+    NodeKind.deployment.value: "deployment",
+    NodeKind.replicaset.value: "replicaset",
+    NodeKind.configmap.value: "configmap",
+    NodeKind.secret.value: "secret",
+    NodeKind.pvc.value: "pvc",
+}
+
+# Unicode glyphs approximating the vis.js shapes, for the HTML legend.
+_SHAPE_GLYPH = {
+    "star": "★", "diamond": "◆", "dot": "●", "square": "■",
+    "triangle": "▲", "triangleDown": "▼", "box": "▭", "database": "🛢",
+    "hexagon": "⬢",
 }
 
 # Node color by rolled-up health (falls back to the boolean 'healthy' attr).
@@ -265,6 +286,14 @@ def _render(graph: DependencyGraph, node_ids, title: str, height: str,
     else:
         html = label_html + html
 
+    # Legend (shape=kind, color=health) — bottom-left, out of the way of the
+    # title label (top-right) and pod picker (top-left).
+    legend_html = _legend_html()
+    if "<body>" in html:
+        html = html.replace("<body>", "<body>" + legend_html, 1)
+    else:
+        html = legend_html + html
+
     # Inject the pod picker (if requested) right after <body> so it overlays
     # the graph canvas as a fixed control.
     if with_pod_filter:
@@ -288,5 +317,45 @@ def _title_label_html(title: str) -> str:
          max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
          title="{safe}">
       {safe}
+    </div>
+    """
+
+
+def _legend_html() -> str:
+    """Fixed-position legend: shape = node kind, color = health. Built from the
+    same ``_SHAPE``/``_HEALTH_COLOR`` maps the renderer uses, so it can't drift
+    from what's actually drawn."""
+    kind_rows = "".join(
+        f'<div style="white-space:nowrap;">'
+        f'<span style="display:inline-block;width:18px;text-align:center;">'
+        f'{_SHAPE_GLYPH.get(_SHAPE.get(k, "dot"), "●")}</span> {label}</div>'
+        for k, label in _KIND_LABEL.items()
+    )
+    health_rows = "".join(
+        f'<div style="white-space:nowrap;">'
+        f'<span style="display:inline-block;width:12px;height:12px;border-radius:2px;'
+        f'background:{color};margin-right:6px;vertical-align:middle;"></span>{state}</div>'
+        for state, color in [
+            (Health.healthy.value, _HEALTH_COLOR[Health.healthy.value]),
+            (Health.degraded.value, _HEALTH_COLOR[Health.degraded.value]),
+            (Health.down.value, _HEALTH_COLOR[Health.down.value]),
+            (Health.unknown.value, _HEALTH_COLOR[Health.unknown.value]),
+        ]
+    )
+    return f"""
+    <div id="graph-legend" style="position:fixed;bottom:10px;left:10px;z-index:999;
+         background:rgba(255,255,255,0.95);border:1px solid #ccc;border-radius:6px;
+         padding:8px 12px;font-family:sans-serif;font-size:12px;color:#333;
+         box-shadow:0 1px 4px rgba(0,0,0,0.2);line-height:1.5;">
+      <div style="display:flex;gap:18px;">
+        <div>
+          <div style="font-weight:bold;margin-bottom:3px;">Shape = kind</div>
+          {kind_rows}
+        </div>
+        <div>
+          <div style="font-weight:bold;margin-bottom:3px;">Color = health</div>
+          {health_rows}
+        </div>
+      </div>
     </div>
     """

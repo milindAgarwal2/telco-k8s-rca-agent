@@ -272,6 +272,105 @@ class DependencyGraph:
                 out.add(attrs.get("display", v))
         return out
 
+    def owners(self, pod_id: str) -> dict:
+        """Resolve the workload and service a pod belongs to, for the UI header.
+
+        Walks ``managed_by`` out-edges (pod -> replicaset -> deployment) to find
+        the top workload, and ``selects`` in-edges (service -> pod) to find any
+        fronting Service. Returns display names:
+        ``{"workload": <name|None>, "workload_kind": <str|None>, "service": <name|None>}``.
+        """
+        result = {"workload": None, "workload_kind": None, "service": None}
+        if not self._g.has_node(pod_id):
+            return result
+
+        # managed_by: pod -> replicaset -> deployment. Prefer a deployment-kind
+        # owner; fall back to whatever managed_by target exists.
+        best = None
+        for _u, v, k in self._g.out_edges(pod_id, keys=True):
+            if k != EdgeKind.managed_by.value:
+                continue
+            kind = self._g.nodes.get(v, {}).get("kind")
+            if kind == NodeKind.deployment.value:
+                best = v
+                break
+            # replicaset: hop once more to its deployment
+            for _uu, vv, kk in self._g.out_edges(v, keys=True):
+                if kk == EdgeKind.managed_by.value and \
+                        self._g.nodes.get(vv, {}).get("kind") == NodeKind.deployment.value:
+                    best = vv
+                    break
+            if best is None:
+                best = v  # bare replicaset owner as a fallback
+        if best is not None:
+            node = self._g.nodes.get(best, {})
+            result["workload"] = node.get("display", best)
+            result["workload_kind"] = node.get("workload_kind") or "Deployment"
+
+        # selects: service -> pod (in-edge on the pod)
+        for u, _v, k in self._g.in_edges(pod_id, keys=True):
+            if k == EdgeKind.selects.value and \
+                    self._g.nodes.get(u, {}).get("kind") == NodeKind.service.value:
+                result["service"] = self._g.nodes.get(u, {}).get("display", u)
+                break
+        return result
+
+    def anchor_of(self, pod_id: str) -> dict:
+        """Resolve the incident *anchor* for a pod: the stable entity a fault
+        should be attributed to.
+
+        Priority: the fronting **Service** (``selects`` in-edge) > the owning
+        **workload** (Deployment/StatefulSet/DaemonSet via ``managed_by``) >
+        the **pod itself** (bare Job/standalone pod fallback). Returns
+        ``{"id": <node_id>, "kind": <"service"|"deployment"|"pod">,
+        "display": <str>}``. For a non-pod id (or unknown), the id is its own
+        anchor.
+        """
+        if not self._g.has_node(pod_id):
+            return {"id": pod_id, "kind": "pod", "display": pod_id}
+        if self._g.nodes[pod_id].get("kind") != NodeKind.pod.value:
+            # Already a service/workload/etc. — it is its own anchor.
+            attrs = self._g.nodes[pod_id]
+            return {"id": pod_id, "kind": attrs.get("kind", "pod"),
+                    "display": attrs.get("display", pod_id)}
+
+        # 1) fronting Service (service --selects--> pod)
+        for u, _v, k in self._g.in_edges(pod_id, keys=True):
+            if k == EdgeKind.selects.value and \
+                    self._g.nodes.get(u, {}).get("kind") == NodeKind.service.value:
+                return {"id": u, "kind": NodeKind.service.value,
+                        "display": self._g.nodes.get(u, {}).get("display", u)}
+
+        # 2) owning workload (pod -> [replicaset ->] deployment)
+        o = self.owners(pod_id)
+        if o.get("workload"):
+            # owners() returns display names; find the matching workload node id.
+            for nid, attrs in self._g.nodes(data=True):
+                if attrs.get("kind") == NodeKind.deployment.value and \
+                        attrs.get("display", nid) == o["workload"]:
+                    return {"id": nid, "kind": NodeKind.deployment.value,
+                            "display": o["workload"]}
+            return {"id": o["workload"], "kind": NodeKind.deployment.value,
+                    "display": o["workload"]}
+
+        # 3) fallback: the pod is its own anchor
+        return {"id": pod_id, "kind": NodeKind.pod.value,
+                "display": self._g.nodes[pod_id].get("display", pod_id)}
+
+    def pods_of_anchor(self, anchor_id: str) -> list[str]:
+        """Pods belonging to an anchor: a Service's selected pods, a workload's
+        managed pods, or just the pod itself if the anchor IS a pod."""
+        if not self._g.has_node(anchor_id):
+            return [anchor_id]
+        kind = self._g.nodes[anchor_id].get("kind")
+        if kind == NodeKind.service.value:
+            return self.selected_pods(anchor_id)
+        if kind == NodeKind.deployment.value:
+            return self.managed_pods(anchor_id)
+        if kind == NodeKind.pod.value:
+            return [anchor_id]
+        return []
+
     def _traverse(self, start: str, kind: EdgeKind, reverse: bool,
                   max_depth: int) -> list[str]:
         if not self._g.has_node(start):
@@ -327,12 +426,29 @@ class DependencyGraph:
             ],
         }
 
+    def node_breakdown(self) -> dict:
+        """Count of nodes per :class:`NodeKind` value (e.g. {"pod": 312, ...})."""
+        counts: dict[str, int] = {}
+        for _n, attrs in self._g.nodes(data=True):
+            k = attrs.get("kind", "unknown")
+            counts[k] = counts.get(k, 0) + 1
+        return dict(sorted(counts.items(), key=lambda kv: kv[1], reverse=True))
+
+    def edge_breakdown(self) -> dict:
+        """Count of edges per :class:`EdgeKind` value."""
+        counts: dict[str, int] = {}
+        for _u, _v, k in self._g.edges(keys=True):
+            counts[k] = counts.get(k, 0) + 1
+        return dict(sorted(counts.items(), key=lambda kv: kv[1], reverse=True))
+
     def stats(self) -> dict:
         return {
             "nodes": self._g.number_of_nodes(),
             "edges": self._g.number_of_edges(),
             "changes": len(self.changes),
             "last_rebuilt": self.last_rebuilt.isoformat() if self.last_rebuilt else None,
+            "by_kind": self.node_breakdown(),
+            "edges_by_kind": self.edge_breakdown(),
         }
 
 
