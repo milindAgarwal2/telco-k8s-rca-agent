@@ -10,11 +10,17 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from rca_agent.rag.local_store import LocalRunbookStore, chunk_text, extract_text
+from rca_agent.rag.local_store import (
+    LocalRunbookStore,
+    _normalize_pdf_text,
+    chunk_text,
+    extract_text,
+)
 from rca_agent.rag.query_log import QueryLog
 from rca_agent.rag.runbook_retriever import (
     LocalRunbookRetriever,
     NullRunbookRetriever,
+    _snippet,
     get_runbook_retriever,
 )
 
@@ -60,6 +66,75 @@ def test_extract_text_plain_text():
 
 def test_extract_text_markdown():
     assert extract_text("runbook.md", b"# Title\n\nBody") == "# Title\n\nBody"
+
+
+# ---- _normalize_pdf_text (PDF layout cleanup) -------------------------------
+
+def test_normalize_rejoins_softwrap_arrows():
+    # pypdf marks a layout-wrapped line with a trailing arrow; the next line is
+    # its continuation, often split mid-token ("VER" + "SION").
+    raw = "kubectl get nodes NAME STATUS VER \u2192\nSION\nnext line"
+    out = _normalize_pdf_text(raw)
+    assert "VERSION" in out
+    assert "\u2192" not in out  # no arrow artifacts remain
+
+
+def test_normalize_strips_page_boilerplate():
+    raw = (
+        "Solution: do the thing\n"
+        "Troubleshoot Common Issues in Kubernetes Clusters\n"
+        "113/154 51-AXB 250 19 Uen C | 2025-01-24\n"
+        "17\n"  # bare page number
+        "2. do the next thing"
+    )
+    out = _normalize_pdf_text(raw)
+    assert "Solution: do the thing" in out
+    assert "2. do the next thing" in out
+    assert "Troubleshoot Common Issues" not in out
+    assert "Uen C" not in out
+
+
+def test_normalize_drops_example_table_rows():
+    raw = (
+        "1. Check the nodes.\n"
+        "seliius06950   Ready   master   146d   v1.17.3\n"
+        "seliius19680   NotReady   worker   146d   v1.17.3\n"
+        "Every worker in NotReady status is unavailable."
+    )
+    out = _normalize_pdf_text(raw)
+    assert "Check the nodes" in out
+    assert "Every worker in NotReady status is unavailable." in out
+    assert "seliius06950" not in out  # sample table rows removed
+
+
+# ---- chunk_text on document structure --------------------------------------
+
+def test_chunk_text_splits_on_solution_heading():
+    text = (
+        "Cause: the pod ran out of memory and was terminated by the kernel.\n\n"
+        "Solution: restore the previous memory limit and restart the pod so it "
+        "picks up the corrected configuration value."
+    )
+    chunks = chunk_text(text)
+    assert len(chunks) == 2
+    assert chunks[0].startswith("Cause:")
+    assert chunks[1].startswith("Solution:")
+
+
+# ---- _snippet (readable excerpts) ------------------------------------------
+
+def test_snippet_collapses_whitespace_and_newlines():
+    s = _snippet("line one\n\nline   two\tline three")
+    assert "\n" not in s
+    assert "  " not in s
+    assert s == "line one line two line three"
+
+
+def test_snippet_truncates_on_word_boundary_with_ellipsis():
+    s = _snippet(" ".join(["word"] * 200), limit=50)
+    assert s.endswith("\u2026")  # ends with …
+    assert len(s) <= 55
+    assert not s[:-2].endswith("wor")  # not sliced mid-word
 
 
 # ---- LocalRunbookStore ------------------------------------------------------

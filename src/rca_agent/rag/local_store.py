@@ -53,24 +53,55 @@ class _StoreState:
     chunks: dict[str, list[RunbookChunk]] = field(default_factory=dict)  # doc_name -> chunks
 
 
-def chunk_text(text: str) -> list[str]:
-    """Split ``text`` into paragraph-sized chunks.
+_SECTION_HEADING_RE = re.compile(
+    r"^(?:Solution|Cause|Diagnostics|Verification|Prerequisites)\b", re.IGNORECASE
+)
+# A numbered-section heading like "4.5 Pod Is in CrashLoopBackOff Status" or
+# "4.5.1 eric-pm-server-0 Pod Is in CrashLoopBackoff Status ...".
+_NUMBERED_HEADING_RE = re.compile(r"^\d+(?:\.\d+){0,3}\s+[A-Z]")
 
-    Splits on blank lines; a too-short paragraph is merged into the next one
-    (a lone heading is useless alone); a too-long one is hard-wrapped at a
-    word boundary so no single chunk can dominate scoring just by being huge.
+
+def chunk_text(text: str) -> list[str]:
+    """Split ``text`` into coherent, readable chunks.
+
+    Primary split is on the document's own structure -- a new chunk starts at a
+    section heading (``Solution:``, ``Cause:``, ``Diagnostics``, ``Verification``)
+    or a numbered section heading (``4.5 Pod Is in ...``). Within that, blank
+    lines still separate paragraphs. This keeps a remedy ("Solution: ... 1. ...
+    2. ...") together as one chunk instead of mixing it with the next section,
+    and stops a heading from being stranded on its own.
+
+    A too-short fragment is merged into the next one (a lone heading is useless
+    alone); a too-long one is hard-wrapped at a word boundary so no single chunk
+    dominates scoring just by being huge.
     """
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
     chunks: list[str] = []
     pending = ""
-    for p in paragraphs:
-        pending = f"{pending} {p}".strip() if pending else p
-        if len(pending) < _MIN_CHUNK_CHARS:
-            continue
-        chunks.extend(_hard_wrap(pending))
+
+    def flush() -> None:
+        nonlocal pending
+        if pending.strip():
+            chunks.extend(_hard_wrap(pending.strip()))
         pending = ""
-    if pending:
-        chunks.extend(_hard_wrap(pending))
+
+    for p in paragraphs:
+        first_line = p.splitlines()[0].strip() if p else ""
+        starts_section = bool(
+            _SECTION_HEADING_RE.match(first_line) or _NUMBERED_HEADING_RE.match(first_line)
+        )
+        # Start a fresh chunk at a section boundary -- but only if what we've
+        # accumulated is already a usable chunk; otherwise keep appending so a
+        # lone heading isn't stranded.
+        if starts_section and len(pending) >= _MIN_CHUNK_CHARS:
+            flush()
+        pending = f"{pending}\n\n{p}".strip() if pending else p
+        # A section that has grown past the floor is closed on the next heading
+        # to keep remedies whole; but a non-heading block that's already huge is
+        # flushed now so no single chunk dominates scoring.
+        if not starts_section and len(pending) >= _MAX_CHUNK_CHARS:
+            flush()
+    flush()
     return chunks
 
 
@@ -193,13 +224,87 @@ def get_local_store(path: str | None = None) -> LocalRunbookStore:
     return LocalRunbookStore(path or get_settings().runbook_store_path)
 
 
+def _normalize_pdf_text(raw: str) -> str:
+    """Clean pypdf's raw extraction into readable prose.
+
+    pypdf renders this guide's layout with three kinds of noise that make
+    snippets unreadable (and pollute scoring):
+
+    1. Soft-wrap markers: a line hard-wrapped by the PDF layout ends with a
+       trailing ``→`` (U+2192) and continues on the next line. We rejoin those
+       so ``v1. →\n17.3`` becomes ``v1.17.3``.
+    2. Repeated page header/footer boilerplate, e.g.
+       ``113/154 51-AXB 250 19 Uen C | 2025-01-24`` and the running title
+       ``Troubleshoot Common Issues in Kubernetes Clusters`` plus bare page
+       numbers -- these repeat on every page and add nothing.
+    3. Long literal example-output blocks (sample ``kubectl get nodes`` tables,
+       node lists like ``seliius06950 Ready master 146d v1.17.3``). They are
+       illustrations, not instructions, and they drown the actual remedy text
+       in a snippet. We drop obvious tabular example rows.
+
+    This is deliberately conservative: it only removes lines that match
+    recognizable noise patterns, so real instruction text is preserved.
+    """
+    lines = raw.splitlines()
+
+    # --- step 1: rejoin soft-wrapped lines (trailing arrow) ---
+    joined: list[str] = []
+    carry = ""
+    for ln in lines:
+        s = ln.rstrip()
+        if s.endswith("\u2192"):  # trailing → : continues on next line
+            carry += s[:-1].rstrip()
+            continue
+        if carry:
+            # The continuation of a soft-wrapped line. pypdf splits mid-token
+            # (e.g. "VER" + "SION"), so join with no space.
+            joined.append((carry + s.lstrip()).strip())
+            carry = ""
+        else:
+            joined.append(s)
+    if carry:
+        joined.append(carry.strip())
+
+    # --- step 2/3: drop boilerplate and example-output rows ---
+    footer_re = re.compile(r"^\d+\s*/\s*\d+\s+[\dA-Za-z \-]*Uen\b")  # "113/154 51-AXB ... Uen C"
+    title_re = re.compile(r"^Troubleshoot Common Issues in Kubernetes Clusters\s*$")
+    page_num_re = re.compile(r"^\d{1,3}\s*$")
+    date_tail_re = re.compile(r"\|\s*20\d\d-\d\d-\d\d\s*$")
+    # Example node/pod table rows: a hostname-ish token followed by Ready/NotReady
+    # and a kube version, or many columns of whitespace-separated sample data.
+    example_row_re = re.compile(
+        r"^\S+\s+(Ready|NotReady|Running|Pending|Completed|CrashLoopBackOff)\b.*\bv?\d+\.\d+")
+
+    cleaned: list[str] = []
+    for ln in joined:
+        s = ln.strip()
+        if not s:
+            cleaned.append("")
+            continue
+        if footer_re.match(s) or title_re.match(s) or page_num_re.match(s):
+            continue
+        if date_tail_re.search(s):
+            continue
+        if example_row_re.match(s):
+            continue
+        cleaned.append(s)
+
+    text = "\n".join(cleaned)
+    # Collapse 3+ blank lines to a single blank line.
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
+
 def extract_text(filename: str, content: bytes) -> str:
     """Best-effort plain-text extraction for an uploaded runbook file.
 
     ``.txt``/``.md`` are decoded directly. ``.pdf`` uses ``pypdf`` (pure
     Python, no compiled/native dependency, unlike PyMuPDF or Spire.PDF) --
     deliberately the lighter choice given this image already carries
-    Streamlit's own dependency weight.
+    Streamlit's own dependency weight. PDF output is passed through
+    :func:`_normalize_pdf_text` to strip layout artifacts (soft-wrap arrows,
+    page boilerplate, literal example-output tables) so chunks and snippets
+    read as prose rather than mangled tables.
     """
     ext = os.path.splitext(filename)[1].lower()
     if ext == ".pdf":
@@ -211,6 +316,7 @@ def extract_text(filename: str, content: bytes) -> str:
             ) from exc
         import io
         reader = PdfReader(io.BytesIO(content))
-        return "\n\n".join(page.extract_text() or "" for page in reader.pages)
+        raw = "\n\n".join(page.extract_text() or "" for page in reader.pages)
+        return _normalize_pdf_text(raw)
     # .txt, .md, or anything else: treat as plain text.
     return content.decode("utf-8", errors="replace")

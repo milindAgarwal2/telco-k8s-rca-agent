@@ -51,6 +51,28 @@ def _normalize_query_tokens(query: str) -> list[str]:
     return [t for t in _tokenize(query) if not _HASH_LIKE_RE.match(t)]
 
 
+_SNIPPET_MAX = 320
+
+
+def _snippet(text: str, limit: int = _SNIPPET_MAX) -> str:
+    """Build a readable one-paragraph excerpt for a runbook hit.
+
+    Collapses internal whitespace/newlines to single spaces (a chunk may span
+    several wrapped lines) and truncates at a word boundary with an ellipsis,
+    so the suggested next step reads as a sentence rather than a raw,
+    mid-word-truncated dump.
+    """
+    flat = " ".join(text.split())
+    if len(flat) <= limit:
+        return flat
+    cut = flat[:limit]
+    # Back up to the last word boundary so we don't slice mid-word.
+    sp = cut.rfind(" ")
+    if sp > limit * 0.6:
+        cut = cut[:sp]
+    return cut.rstrip(" .,;:") + " …"
+
+
 class RunbookHit(BaseModel):
     title: str
     snippet: str
@@ -152,7 +174,7 @@ class LocalRunbookRetriever(RunbookRetriever):
         return [
             RunbookHit(
                 title=chunk.doc_name,
-                snippet=chunk.text[:400],
+                snippet=_snippet(chunk.text),
                 source=f"{chunk.doc_name}#chunk{chunk.chunk_index}",
                 score=round(score, 3),
             )
