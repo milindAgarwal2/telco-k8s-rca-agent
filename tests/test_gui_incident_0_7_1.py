@@ -66,6 +66,36 @@ def test_ui_graph_picker_partial_renders_datalist_and_map():
     assert "__nodeMap" in r.text     # display->id map
 
 
+def test_graph_view_accepts_slash_in_node_id():
+    """Regression: service/node ids contain a '/' (e.g. 'service/upf'); the
+    /graph/view/{node_id:path} route must match them (was a 404 before the
+    :path converter fix)."""
+    from fastapi.testclient import TestClient
+
+    import rca_agent.webhook.app as appinst
+    client = TestClient(appinst)
+    # real slash id present in the demo graph
+    assert client.get("/graph/view/service/upf",
+                      params={"with_pod_filter": False}).status_code == 200
+    # a slash id that does not exist still 404s (route matched, node missing)
+    assert client.get("/graph/view/service/nope").status_code == 404
+    # bare (slashless) ids still work
+    assert client.get("/graph/view/upf-0").status_code == 200
+
+
+def test_picker_option_values_are_emoji_free_for_typeahead():
+    """Regression: datalist option values must be the clean name (no leading
+    health emoji), or browser typeahead can't match what the user types."""
+    from fastapi.testclient import TestClient
+
+    import rca_agent.webhook.app as appinst
+    client = TestClient(appinst)
+    html = client.get("/ui/graph/nodes", params={"kind": "service"}).text
+    import re
+    for val in re.findall(r'<option value="([^"]*)"', html):
+        assert all(ord(c) < 128 for c in val), f"option value not ASCII/clean: {val!r}"
+
+
 # ---- 0.7.2: event evidence timestamps --------------------------------------
 
 def test_event_evidence_has_timestamp_prefix_and_field():

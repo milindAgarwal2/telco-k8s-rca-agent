@@ -238,7 +238,7 @@ def graph_nodes(kind: str = "pod") -> dict:
     return {"kind": kind, "count": len(nodes), "nodes": nodes}
 
 
-@app.get("/graph/neighborhood/{node_id}")
+@app.get("/graph/neighborhood/{node_id:path}")
 def graph_neighborhood(node_id: str, radius: int = 1) -> dict:
     return _graph_builder.graph.neighborhood(node_id, radius=radius)
 
@@ -262,7 +262,7 @@ def graph_view(hide_orphans: bool = True, with_pod_filter: bool = True) -> HTMLR
     return HTMLResponse(content=html)
 
 
-@app.get("/graph/view/{node_id}", response_class=HTMLResponse)
+@app.get("/graph/view/{node_id:path}", response_class=HTMLResponse)
 def graph_view_node(node_id: str, radius: int = 2,
                     hide_orphans: bool = False, with_pod_filter: bool = True) -> HTMLResponse:
     """Interactive HTML visualization of one node's neighborhood.

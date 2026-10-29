@@ -46,19 +46,25 @@
     var inp = document.getElementById('node-input');
     var map = window.__nodeMap || {};
     var id = map[inp.value];
-    // Only act once the typed text exactly matches a known option (i.e. the
-    // user picked an entry), so we don't reload on every keystroke.
-    if (id) {
+    // Act only once the typed text exactly matches a known option (i.e. the
+    // user picked/completed an entry), so we don't reload on every keystroke.
+    if (id && id !== __selectedNodeId) {
       __selectedNodeId = id;
       updateGraph();
     }
+  }
+
+  // Encode each path segment but KEEP the "/" separators, so an id like
+  // "service/eric-cm-mediator-db-pg" stays a valid /graph/view/{node_id:path}.
+  function encodeNodeId(id) {
+    return id.split('/').map(encodeURIComponent).join('/');
   }
 
   function updateGraph() {
     var r = document.getElementById('radius-select').value;
     var base = "{{ root }}";
     var url = __selectedNodeId
-      ? (base + "graph/view/" + encodeURIComponent(__selectedNodeId) + "?radius=" + r + "&with_pod_filter=false")
+      ? (base + "graph/view/" + encodeNodeId(__selectedNodeId) + "?radius=" + r + "&with_pod_filter=false")
       : (base + "graph/view?with_pod_filter=false");
     document.getElementById('graph-frame').src = url;
   }
