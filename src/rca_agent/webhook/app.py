@@ -215,6 +215,29 @@ def graph_pods() -> dict:
     return {"count": len(pods), "pods": pods}
 
 
+# Node kinds the Graph-tab picker exposes. Restricted to the three the user
+# navigates by; other kinds (configmap/secret/pvc/...) are reachable only as
+# neighbors of these, not as top-level picker entries.
+_PICKER_KINDS = ("node", "service", "pod")
+
+
+@app.get("/graph/nodes")
+def graph_nodes(kind: str = "pod") -> dict:
+    """List graph nodes of one ``kind`` for the viz picker.
+
+    ``kind`` is one of ``node`` (K8s worker node), ``service`` or ``pod``
+    (default). Returns ``{kind, count, nodes:[{id,display,health,kind,
+    component}]}`` sorted by display name — the searchable type-filtered
+    picker in the Graph tab consumes this.
+    """
+    if kind not in _PICKER_KINDS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"kind must be one of {_PICKER_KINDS}, got '{kind}'")
+    nodes = _graph_builder.graph.node_summaries(kind=kind)
+    return {"kind": kind, "count": len(nodes), "nodes": nodes}
+
+
 @app.get("/graph/neighborhood/{node_id}")
 def graph_neighborhood(node_id: str, radius: int = 1) -> dict:
     return _graph_builder.graph.neighborhood(node_id, radius=radius)
@@ -257,19 +280,33 @@ def graph_view_node(node_id: str, radius: int = 2,
 
 
 @app.get("/incidents")
-def list_incidents(limit: int = 20) -> dict:
+def list_incidents(limit: int = 20, status: str = "active") -> dict:
     """Incidents the event watcher auto-detected OR a human posted via the
     webhook, newest first — both paths share one timeline.
 
-    Summary only (symptom/top-cause/confidence/related_count) — see
+    ``status`` filters by lifecycle (0.7.3): ``active`` (default — still
+    unhealthy), ``inactive`` (recovered: all affected pods healthy again) or
+    ``all``. An incident flips to inactive STRICTLY — only when every pod in
+    ``affected_pods`` is healthy in the current graph.
+
+    Summary only (symptom/top-cause/confidence/related_count/status) — see
     ``/incidents/{id}`` for the full report with evidence chains, citations,
     and the ``related_incidents`` ids (incidents sharing this one's exact
     failure signature on a different resource within the correlation window
     — a pattern flag, not a claimed shared cause; see PLAN.md Known Issues).
     """
-    incidents = list(reversed(_event_watcher.incidents))[:max(1, limit)]
+    status = status.lower()
+    if status not in ("active", "inactive", "all"):
+        raise HTTPException(
+            status_code=400,
+            detail="status must be one of 'active', 'inactive', 'all'")
+    incidents = list(reversed(_event_watcher.incidents))  # newest first
+    if status != "all":
+        incidents = [r for r in incidents if r.status == status]
+    incidents = incidents[:max(1, limit)]
     return {
         "count": len(incidents),
+        "status": status,
         "incidents": [
             {
                 "incident_id": r.incident_id,
@@ -277,6 +314,8 @@ def list_incidents(limit: int = 20) -> dict:
                 "symptom": r.symptom,
                 "affected_resource": r.affected_resource,
                 "severity": r.severity,
+                "status": r.status,
+                "resolved_at": r.resolved_at,
                 "top_cause": r.top_hypothesis.cause if r.top_hypothesis else None,
                 "confidence": r.top_hypothesis.confidence if r.top_hypothesis else None,
                 "related_count": len(r.related_incidents),

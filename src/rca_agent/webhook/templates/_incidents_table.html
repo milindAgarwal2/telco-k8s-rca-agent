@@ -1,7 +1,7 @@
 {% set sev_icon = {"critical": "🔴", "warning": "🟠", "info": "🔵"} %}
 {% if incidents %}
 <table class="table table-sm align-middle">
-  <thead><tr><th>Severity</th><th>Symptom</th><th>Resource</th><th>Top cause</th>
+  <thead><tr><th>Status</th><th>Severity</th><th>Symptom</th><th>Resource</th><th>Top cause</th>
     <th style="width:150px">Confidence</th><th class="text-center">Rel.</th></tr></thead>
   <tbody>
   {% for i in incidents %}
@@ -10,6 +10,14 @@
     {% set color = '#ff6b6b' if conf >= 0.75 else ('#ffb84d' if conf >= 0.5 else '#4dabf7') %}
     <tr class="row-clickable" hx-get="{{ root }}ui/incidents/{{ i.incident_id }}"
         hx-target="#inc-detail" hx-swap="innerHTML">
+      <td>
+        {% if i.status == "inactive" %}
+          <span class="badge text-bg-success">✅ inactive</span>
+          {% if i.resolved_at %}<div class="text-secondary" style="font-size:.7rem;">{{ i.resolved_at[:19] }}</div>{% endif %}
+        {% else %}
+          <span class="badge text-bg-warning">🟠 active</span>
+        {% endif %}
+      </td>
       <td class="sev-{{ i.severity }}">{{ sev_icon.get(i.severity, "⚪") }} {{ i.severity }}</td>
       <td>{{ i.symptom }}</td>
       <td><code>{{ i.affected_resource }}</code></td>
@@ -22,7 +30,7 @@
   {% endfor %}
   </tbody>
 </table>
-<div class="small text-secondary">{{ incidents | length }} incident(s) · newest first · click a row to inspect</div>
+<div class="small text-secondary">{{ incidents | length }} {{ status or "active" }} incident(s) · newest first · click a row to inspect</div>
 {% else %}
-<div class="alert alert-secondary small">No incidents yet. Either nothing is unhealthy, or (in demo/no-cluster mode) none posted to /webhook/alertmanager yet.</div>
+<div class="alert alert-secondary small">No {{ status or "active" }} incidents. {% if status == "inactive" %}Nothing has recovered yet.{% elif status == "active" %}Either nothing is unhealthy, or (in demo/no-cluster mode) none posted to /webhook/alertmanager yet.{% else %}No incidents recorded yet.{% endif %}</div>
 {% endif %}

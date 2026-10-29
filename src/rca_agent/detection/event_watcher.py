@@ -173,9 +173,52 @@ class EventWatcher:
         # Fix B: status-based detection, independent of fresh events.
         new_reports.extend(self._detect_from_status(graph, ns, diag))
 
+        # 0.7.3: flip recovered incidents to inactive (STRICT: all pods healthy).
+        diag["resolved_now"] = self.reconcile_status(graph)
+
         diag["unhealthy_pods"] = sum(1 for _ in self._unhealthy_graph_pods(graph))
         self.last_diag = diag
         return new_reports
+
+    def _pod_is_unhealthy(self, graph, pod_id: str) -> bool:
+        """True if the pod is CURRENTLY unhealthy in the graph. A pod missing
+        from the graph is treated as recovered (not unhealthy) — it is no longer
+        a live fault signal (rolled out / deleted)."""
+        attrs = graph.graph.nodes.get(pod_id)
+        if not attrs:
+            return False
+        return attrs.get("healthy") is False or attrs.get("health") == "down"
+
+    def reconcile_status(self, graph) -> int:
+        """Flip active incidents to inactive once their fault clears.
+
+        STRICT recovery: an incident becomes inactive only when EVERY pod in
+        ``affected_pods`` is healthy again in the current graph (a pod removed
+        from the graph counts as recovered). Pod-anchored incidents with no
+        ``affected_pods`` fall back to their ``affected_resource``. Covers all
+        incidents in the pool (event-, status- and webhook-sourced), not just
+        status-detected ones. Returns how many were flipped this cycle.
+        """
+        flipped = 0
+        for inc in self.incidents:
+            if inc.status != "active":
+                continue
+            pods = inc.affected_pods or (
+                [inc.affected_resource] if inc.affected_resource else [])
+            if not pods:
+                continue  # nothing to check against; leave active
+            if any(self._pod_is_unhealthy(graph, p) for p in pods):
+                continue  # at least one pod still unhealthy -> stays active
+            inc.status = "inactive"
+            inc.resolved_at = _now()
+            # Let it re-fire if it breaks again: clear status-detection latches.
+            for p in pods:
+                self._status_incident_open.discard(p)
+                self._unhealthy_streak.pop(p, None)
+            flipped += 1
+            logger.info("event-watcher: incident %s resolved (all %d pod(s) healthy)",
+                        inc.incident_id, len(pods))
+        return flipped
 
     def _unhealthy_graph_pods(self, graph):
         """Yield (node_id, reason) for pod nodes currently marked unhealthy."""

@@ -71,6 +71,13 @@ class IncidentReport(BaseModel):
     severity: Severity = Severity.warning
     detected_at: datetime | None = None
 
+    # Lifecycle (0.7.3): an incident is "active" while its affected pods are
+    # still unhealthy, and flips to "inactive" (with resolved_at set) once the
+    # fault clears. STRICT recovery: inactive only when ALL affected_pods are
+    # healthy again in the current graph (see event_watcher.reconcile_status).
+    status: str = "active"  # "active" | "inactive"
+    resolved_at: datetime | None = None
+
     # Reasoning outputs.
     hypotheses: list[Hypothesis] = Field(default_factory=list)
     blast_radius: list[str] = Field(default_factory=list)

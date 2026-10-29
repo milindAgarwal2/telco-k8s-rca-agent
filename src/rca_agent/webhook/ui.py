@@ -56,14 +56,22 @@ def init(app, *, graph_builder, event_watcher, local_store, query_log,
     def _stats() -> dict:
         return graph_builder.graph.stats()
 
-    def _incident_rows() -> list[dict]:
-        incidents = list(reversed(event_watcher.incidents))[:100]
+    def _incident_rows(status: str = "active") -> list[dict]:
+        status = (status or "active").lower()
+        if status not in ("active", "inactive", "all"):
+            status = "active"
+        incidents = list(reversed(event_watcher.incidents))  # newest first
+        if status != "all":
+            incidents = [r for r in incidents if r.status == status]
+        incidents = incidents[:100]
         return [{
             "incident_id": r.incident_id,
             "created_at": str(r.created_at),
             "symptom": r.symptom,
             "affected_resource": r.affected_resource,
             "severity": getattr(r.severity, "value", r.severity),
+            "status": r.status,
+            "resolved_at": str(r.resolved_at) if r.resolved_at else None,
             "top_cause": r.top_hypothesis.cause if r.top_hypothesis else None,
             "confidence": r.top_hypothesis.confidence if r.top_hypothesis else 0.0,
             "related_count": len(r.related_incidents),
@@ -83,7 +91,8 @@ def init(app, *, graph_builder, event_watcher, local_store, query_log,
         name = _TAB_TEMPLATES.get(tab, "_incidents.html")
         ctx: dict = {"root": _root(request)}
         if tab == "graph":
-            ctx["pods"] = graph_builder.graph.pods()
+            ctx["kind"] = "pod"
+            ctx["nodes"] = graph_builder.graph.node_summaries(kind="pod")
             ctx["dot"] = _HEALTH_DOT
         elif tab == "runbooks":
             ctx["stats"] = local_store.stats()
@@ -93,11 +102,28 @@ def init(app, *, graph_builder, event_watcher, local_store, query_log,
             ctx.update(_health_ctx())
         return templates.TemplateResponse(request, name, ctx)
 
+    # ---- graph node picker ----
+    @router.get("/ui/graph/nodes", response_class=HTMLResponse)
+    def graph_nodes_partial(request: Request, kind: str = "pod"):
+        """Searchable node picker (datalist) for one kind, for the Graph tab's
+        type selector to swap in via HTMX when the user changes Node/Service/Pod.
+        """
+        if kind not in ("node", "service", "pod"):
+            kind = "pod"
+        ctx = {
+            "kind": kind,
+            "nodes": graph_builder.graph.node_summaries(kind=kind),
+            "dot": _HEALTH_DOT,
+            "root": _root(request),
+        }
+        return templates.TemplateResponse(request, "_graph_picker.html", ctx)
+
     # ---- incidents ----
     @router.get("/ui/incidents/table", response_class=HTMLResponse)
-    def inc_table(request: Request):
+    def inc_table(request: Request, status: str = "active"):
         return templates.TemplateResponse(request, "_incidents_table.html",
-                                          {"incidents": _incident_rows(), "root": _root(request)})
+                                          {"incidents": _incident_rows(status),
+                                           "status": status, "root": _root(request)})
 
     @router.get("/ui/incidents/{incident_id}", response_class=HTMLResponse)
     def inc_detail(request: Request, incident_id: str):

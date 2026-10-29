@@ -11,10 +11,28 @@
           <label class="form-check-label small text-secondary" for="autorefresh">Auto-refresh</label>
         </div>
         <button class="btn btn-sm btn-outline-secondary"
-                hx-get="{{ root }}ui/incidents/table" hx-target="#inc-table-wrap" hx-swap="innerHTML">🔄 Refresh</button>
+                onclick="reloadIncidents();">🔄 Refresh</button>
       </div>
     </div>
-    <div id="inc-table-wrap" hx-get="{{ root }}ui/incidents/table" hx-trigger="load" hx-swap="innerHTML">
+
+    {# Active / Inactive / All segmented toggle (0.7.3). #}
+    <div class="btn-group btn-group-sm mb-2" role="group" aria-label="Incident status filter">
+      <input type="radio" class="btn-check" name="inc-status" id="st-active" value="active" checked
+             onchange="setIncidentStatus('active');">
+      <label class="btn btn-outline-primary" for="st-active">🟠 Active</label>
+
+      <input type="radio" class="btn-check" name="inc-status" id="st-inactive" value="inactive"
+             onchange="setIncidentStatus('inactive');">
+      <label class="btn btn-outline-success" for="st-inactive">✅ Inactive</label>
+
+      <input type="radio" class="btn-check" name="inc-status" id="st-all" value="all"
+             onchange="setIncidentStatus('all');">
+      <label class="btn btn-outline-secondary" for="st-all">All</label>
+    </div>
+
+    <div id="inc-table-wrap"
+         hx-get="{{ root }}ui/incidents/table?status=active"
+         hx-trigger="load" hx-swap="innerHTML">
       <div class="text-secondary small">Loading…</div>
     </div>
   </div>
@@ -26,3 +44,23 @@
     </div>
   </div>
 </div>
+<script>
+  // Current status filter drives both manual refresh and auto-refresh so the
+  // segregated view (point 5) is preserved across reloads.
+  window.__incStatus = "active";
+
+  function setIncidentStatus(s) {
+    window.__incStatus = s;
+    var w = document.getElementById('inc-table-wrap');
+    w.setAttribute('hx-get', "{{ root }}ui/incidents/table?status=" + s);
+    htmx.process(w);
+    htmx.trigger(w, 'load');
+  }
+
+  function reloadIncidents() {
+    var w = document.getElementById('inc-table-wrap');
+    w.setAttribute('hx-get', "{{ root }}ui/incidents/table?status=" + window.__incStatus);
+    htmx.process(w);
+    htmx.trigger(w, 'load');
+  }
+</script>
