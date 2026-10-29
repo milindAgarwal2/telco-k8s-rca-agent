@@ -127,6 +127,27 @@ class Settings(BaseSettings):
     llm_provider: str = "none"
     llm_model: str | None = None
 
+    # --- Incident capture (for offline precision/recall labeling later) ---
+    # When a path is set, every incident (auto-detected OR webhook-posted) is
+    # appended as one JSONL record capturing the INPUTS (alert + gathered
+    # evidence + optional graph neighborhood) and the agent's OUTPUT (ranked
+    # hypotheses + citations), plus an empty ``labels`` block a human fills in
+    # later. OFF by default (empty path) -- safe to ship. Turn on at DEPLOY
+    # time by setting RCA_INCIDENT_CAPTURE_PATH to a writable (ideally mounted)
+    # file, e.g. RCA_INCIDENT_CAPTURE_PATH=/data/captures/incidents.jsonl
+    #
+    # NOTE: capture records include real log lines / object names from the
+    # monitored namespace -- treat the file as SENSITIVE. Set
+    # RCA_INCIDENT_CAPTURE_REDACT_LOGS=true to drop log bodies (keep reasons/
+    # timestamps). RCA_INCIDENT_CAPTURE_INCLUDE_GRAPH toggles the neighborhood
+    # snapshot (bigger records, but needed for full replay). A rolling cap of
+    # RCA_INCIDENT_CAPTURE_MAX_RECORDS keeps the file bounded.
+    incident_capture_path: str | None = None
+    incident_capture_redact_logs: bool = False
+    incident_capture_include_graph: bool = True
+    incident_capture_max_records: int = 5000
+    incident_capture_graph_radius: int = 2
+
 
 @lru_cache
 def get_settings() -> Settings:

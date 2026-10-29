@@ -58,6 +58,7 @@ from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 
 from rca_agent.config import Settings
+from rca_agent.eval.capture import IncidentCaptureWriter
 from rca_agent.graph.builder import GraphBuilder
 from rca_agent.models.alert import Alert, KubeEvent
 from rca_agent.models.incident import IncidentReport
@@ -102,6 +103,15 @@ class EventWatcher:
         self._status_incident_open: set[str] = set()
         # Last poll's gate counters, surfaced by /debug/detection.
         self.last_diag: dict = {}
+        # Incident capture for offline precision/recall labeling (OFF unless
+        # settings.incident_capture_path is set). Best-effort; never raises.
+        self.capture = IncidentCaptureWriter(
+            settings.incident_capture_path,
+            redact_logs=settings.incident_capture_redact_logs,
+            include_graph=settings.incident_capture_include_graph,
+            max_records=settings.incident_capture_max_records,
+            graph_radius=settings.incident_capture_graph_radius,
+        )
 
     def poll_once(self) -> list[IncidentReport]:
         """Run one polling cycle. Returns any newly-created incident reports."""
@@ -276,7 +286,7 @@ class EventWatcher:
         ``/webhook/alertmanager`` POST), so it shares the same ``/incidents``
         timeline and correlation pool as auto-detected ones. Safe to call for
         every report the webhook produces."""
-        self._store(report)
+        self._store(report, source="webhook")
 
     def _merge_into_open_anchor(self, report: IncidentReport,
                                 pod_name: str) -> IncidentReport | None:
@@ -300,11 +310,13 @@ class EventWatcher:
             return other
         return None
 
-    def _store(self, report: IncidentReport) -> None:
+    def _store(self, report: IncidentReport, source: str = "event_watcher") -> None:
         self.incidents.append(report)
         if len(self.incidents) > _MAX_STORED_INCIDENTS:
             self.incidents.pop(0)
         self._correlate(report)
+        # Capture for later offline labeling (no-op unless configured).
+        self.capture.record(report, source=source, graph=self.builder.graph)
 
     def _correlate(self, report: IncidentReport) -> None:
         """Link ``report`` with any other stored incident that shares its
