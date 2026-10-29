@@ -1,0 +1,9 @@
+case,fault_type,expected_cause,top_hypothesis,matched_rank,top1,top2,error
+oomkilled,OOMKilled,upf-0 OOMKilled,upf-0 OOMKilled,1,yes,yes,
+crashloop,CrashLoopBackOff,smf-0 CrashLoopBackOff,smf-0 failing health probe (smf-0 not ready (readiness probe failing)),2,no,yes,
+imagepull,ImagePullBackOff,amf-0 ImagePullBackOff,amf-0 ImagePullBackOff,1,yes,yes,
+probe_failure,ProbeFailure,diameter-0 failing health probe,diameter-0 failing health probe (55:06] Unhealthy: Readiness probe failed: HTTP probe failed with statuscode: 500),1,yes,yes,
+bad_configmap,BadConfigChange,recent configmap_update to upf-config,upf-0 failing health probe (55:06] Unhealthy: Readiness probe failed: config rejected),2,no,yes,
+unhealthy_upstream,UpstreamCascade,service/upf unhealthy (cascades to smf-0),smf-0 failing health probe (55:06] Unhealthy: Readiness probe failed: upstream UPF unreachable),2,no,yes,
+node_not_ready,NodeNotReady,pcf-0 not ready (node worker-2 NotReady),pcf-0 failing health probe (pcf-0 not ready (readiness probe failing)),1,yes,yes,
+multi_fault_separation,MultiFault,upf-0 OOMKilled (amf-0 ImagePull is a separate incident),upf-0 OOMKilled,1,yes,yes,
