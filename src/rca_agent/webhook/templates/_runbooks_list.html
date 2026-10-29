@@ -1,0 +1,25 @@
+{% if msg %}<div class="alert alert-success py-2 px-3 small">{{ msg }}</div>{% endif %}
+{% if err %}<div class="alert alert-danger py-2 px-3 small">{{ err }}</div>{% endif %}
+{% if docs %}
+<table class="table table-sm align-middle">
+  <thead><tr><th>Name</th><th>Chunks</th><th>Added</th><th></th></tr></thead>
+  <tbody>
+  {% for d in docs %}
+    <tr>
+      <td><strong>{{ d.name }}</strong></td>
+      <td class="text-secondary">{{ d.chunk_count }}</td>
+      <td class="text-secondary small">{{ (d.added_at or "")[:19] }}</td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-outline-danger"
+                hx-delete="{{ root }}ui/runbooks/{{ d.name | urlencode }}"
+                hx-target="#runbook-list" hx-swap="innerHTML"
+                hx-confirm="Delete '{{ d.name }}'? This cannot be undone.">🗑️ Delete</button>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="alert alert-secondary small">No runbooks uploaded yet. Until one is uploaded, incident reports show a neutral
+"no runbook source configured" note instead of guessing at remediation steps.</div>
+{% endif %}

@@ -1,0 +1,23 @@
+<h5>Runbooks</h5>
+<p class="small text-secondary">Upload remediation runbooks (.txt / .md / .pdf) for LocalRunbookRetriever —
+fully local keyword/rarity matching (no embeddings, no vector DB, no LLM). See the Query Log tab
+for what's being asked and whether anything matches.</p>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3"><div class="metric-card p-3"><div class="metric-label">Documents</div><div class="metric-value">{{ stats.documents or 0 }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="metric-card p-3"><div class="metric-label">Chunks</div><div class="metric-value">{{ stats.chunks or 0 }}</div></div></div>
+</div>
+
+<form hx-post="{{ root }}ui/runbooks/upload" hx-encoding="multipart/form-data"
+      hx-target="#runbook-list" hx-swap="innerHTML" class="mb-4">
+  <div class="input-group">
+    <input type="file" class="form-control" name="file" accept=".txt,.md,.pdf" required>
+    <button class="btn btn-primary" type="submit">📤 Upload</button>
+  </div>
+  <div class="form-text">Re-uploading the same filename safely replaces its chunks.</div>
+</form>
+
+<h6>Uploaded documents</h6>
+<div id="runbook-list" hx-get="{{ root }}ui/runbooks/list" hx-trigger="load" hx-swap="innerHTML">
+  <div class="text-secondary small">Loading…</div>
+</div>

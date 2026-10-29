@@ -155,6 +155,14 @@ async def _lifespan(_: FastAPI):
 
 app = FastAPI(title=settings.app_name, version=__version__, lifespan=_lifespan)
 
+# Server-rendered dashboard (replaces the former Streamlit UI; same process,
+# reads the shared objects directly). Served at "/" and "/ui/*".
+from rca_agent.webhook import ui as _ui
+
+_ui.init(app, graph_builder=_graph_builder, event_watcher=_event_watcher,
+         local_store=_local_store, query_log=_query_log,
+         settings=settings, version=__version__)
+
 
 class WebhookResponse(BaseModel):
     received: int
@@ -177,6 +185,27 @@ def readyz() -> dict:
 @app.get("/graph/stats")
 def graph_stats() -> dict:
     return _graph_builder.graph.stats()
+
+
+@app.get("/debug/detection")
+def debug_detection() -> dict:
+    """Why incidents are/aren't being auto-detected — exposes every gate in the
+    event watcher's last poll cycle, so 'no incidents' is self-diagnosing.
+
+    Counters (last cycle): events_seen, events_403 (event list forbidden),
+    matched_fault_reason, dropped_stale (older than event_max_age_minutes),
+    out_of_scope (not a graph node), already_seen (deduped), event_incidents,
+    status_incidents, unhealthy_pods (currently unhealthy in the graph).
+    """
+    return {
+        "cluster_enabled": settings.cluster_enabled,
+        "event_watch_enabled": settings.event_watch_enabled,
+        "status_detection_enabled": settings.status_detection_enabled,
+        "event_max_age_minutes": settings.event_max_age_minutes,
+        "status_unhealthy_rebuilds": settings.status_unhealthy_rebuilds,
+        "last_poll": _event_watcher.last_diag,
+        "total_incidents": len(_event_watcher.incidents),
+    }
 
 
 @app.get("/graph/pods")

@@ -43,24 +43,19 @@ spec:
             readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}
             capabilities:
               {{- toYaml .Values.securityContext.capabilities | nindent 14 }}
-          # Since 0.3.8: Streamlit is the only process bound to this port (the
-          # FastAPI backend is reached over a Unix socket, not a TCP port --
-          # see docker/entrypoint.sh) so /healthz and /readyz are no longer
-          # reachable here. Streamlit's own health endpoint is the only thing
-          # this probe can check now; it can't distinguish "FastAPI's graph
-          # build still running" from "ready" the way /readyz used to. This
-          # chart has never actually been exercised in-cluster yet (real
-          # testing so far has only been plain `docker run` on the Cobra
-          # jumpserver) -- fixed for correctness, not yet validated.
+          # 0.5.0: a single uvicorn process serves both the API and the HTML
+          # dashboard on this port, so /healthz and /readyz are reachable again
+          # (the 0.3.8-0.4.x Streamlit split had hidden them behind a Unix
+          # socket). readyz reflects the background graph build.
           livenessProbe:
             httpGet:
-              path: /_stcore/health
+              path: /healthz
               port: http
             initialDelaySeconds: 5
             periodSeconds: 15
           readinessProbe:
             httpGet:
-              path: /_stcore/health
+              path: /readyz
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
@@ -70,8 +65,8 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:
-        # Streamlit's config/cache and the FastAPI<->Streamlit Unix socket
-        # both live under /tmp -- needs to stay writable even though the
-        # root filesystem itself is read-only.
+        # Writable /tmp for the runbook store and any cache, since the root
+        # filesystem itself is read-only. (0.5.0 dropped the FastAPI<->Streamlit
+        # Unix socket -- a single uvicorn process now serves everything.)
         - name: tmp
           emptyDir: {}

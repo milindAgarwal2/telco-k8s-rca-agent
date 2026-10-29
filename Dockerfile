@@ -11,20 +11,20 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
 
-# Install core + cluster + viz + ui + rag extras:
+# Install core + cluster + viz + rag extras:
 #   cluster -> kubernetes client (reach the cluster)
 #   viz     -> pyvis (interactive /graph/view HTML, embedded in the dashboard)
-#   ui      -> streamlit (the dashboard -- see docker/entrypoint.sh)
 #   rag     -> pypdf + python-multipart (the dashboard's Runbooks tab upload)
-RUN pip install --upgrade pip && pip install ".[cluster,viz,ui,rag]"
+# The dashboard is now server-rendered HTML (FastAPI + Jinja2 + vendored
+# Bootstrap/HTMX) in the SAME process -- no Streamlit, dropping the ~440 MB
+# streamlit/pyarrow/pandas stack (see PLAN-image-size.md).
+RUN pip install --upgrade pip && pip install ".[cluster,viz,rag,pptx]"
 
-COPY streamlit_app ./streamlit_app
 COPY docker ./docker
 RUN chmod +x ./docker/entrypoint.sh
 
-# RCA_PORT is the ONE externally-visible port -- Streamlit binds it directly.
-# FastAPI runs behind a Unix domain socket, not any TCP port at all; see
-# docker/entrypoint.sh for why (this image runs with --network host).
+# The one externally-visible port -- a single uvicorn process serves BOTH the
+# API and the HTML dashboard now (no second process, no Unix-socket split).
 ENV RCA_HOST=0.0.0.0 \
     RCA_PORT=8080
 

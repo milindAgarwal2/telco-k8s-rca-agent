@@ -1,0 +1,25 @@
+<h5>Runbook Query Log</h5>
+<p class="small text-secondary">Every runbook-retrieval attempt made while building an incident's suggested next steps.
+Not LLM calls — this project has no LLM call in the default extractive pipeline. A zero-hit (negative)
+entry is the signal for "write a runbook for this."</p>
+
+<div class="row g-3 mb-3">
+  {% set total = stats.total or 0 %}
+  <div class="col-6 col-md-3"><div class="metric-card p-3"><div class="metric-label">Total queries</div><div class="metric-value">{{ total }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="metric-card p-3"><div class="metric-label">Matched</div><div class="metric-value">{{ stats.positive or 0 }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="metric-card p-3"><div class="metric-label">No match</div><div class="metric-value">{{ stats.negative or 0 }}</div></div></div>
+  <div class="col-6 col-md-3"><div class="metric-card p-3"><div class="metric-label">Hit rate</div><div class="metric-value">{% if total %}{{ ((stats.positive or 0) / total * 100) | round(0,'floor') | int }}%{% else %}—{% endif %}</div></div></div>
+</div>
+
+<div class="d-flex gap-2 mb-2">
+  <button class="btn btn-sm btn-outline-secondary" hx-get="{{ root }}ui/querylog/table?neg=0" hx-target="#ql-table" hx-swap="innerHTML">All</button>
+  <button class="btn btn-sm btn-outline-secondary" hx-get="{{ root }}ui/querylog/table?neg=1" hx-target="#ql-table" hx-swap="innerHTML">Only no-match</button>
+  <a class="btn btn-sm btn-outline-secondary" href="{{ root }}ui/querylog/csv">⬇️ Download CSV</a>
+  <button class="btn btn-sm btn-outline-danger ms-auto"
+          hx-delete="{{ root }}ui/querylog" hx-target="#ql-table" hx-swap="innerHTML"
+          hx-confirm="Permanently clear the query log?">🧹 Clear</button>
+</div>
+
+<div id="ql-table" hx-get="{{ root }}ui/querylog/table?neg=0" hx-trigger="load" hx-swap="innerHTML">
+  <div class="text-secondary small">Loading…</div>
+</div>

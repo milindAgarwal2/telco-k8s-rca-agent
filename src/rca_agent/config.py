@@ -66,6 +66,22 @@ class Settings(BaseSettings):
     # ``cluster_enabled`` is True (no events exist in demo/stub mode).
     event_watch_enabled: bool = True
     event_watch_interval_seconds: int = 15
+    # Maximum age of a Kubernetes Warning event still worth acting on. Kubernetes
+    # stops refreshing an event's lastTimestamp while a fault is ongoing (e.g. a
+    # readiness probe that has been failing for an hour emits its Unhealthy event
+    # only periodically, then goes quiet), so a too-short window makes the
+    # watcher blind to a still-active outage. Default 90 min; raise for faults
+    # that recur slowly, lower to reduce reacting to old, resolved events.
+    event_max_age_minutes: int = 90
+
+    # --- Status-based detection (does NOT depend on fresh K8s events) ---
+    # The graph rolls up each pod's health on every rebuild. A pod that stays
+    # unhealthy across this many consecutive rebuilds is raised as an incident
+    # even when no fresh Event exists — so the agent survives Kubernetes aging
+    # events out from under a still-broken pod. 0 disables status-based
+    # detection (event-only behavior).
+    status_detection_enabled: bool = True
+    status_unhealthy_rebuilds: int = 2
 
     # --- Incident correlation ---
     # Links incidents (auto-detected OR manually posted via the webhook) that

@@ -1,0 +1,123 @@
+{% set sev_icon = {"critical": "🔴", "warning": "🟠", "info": "🔵"} %}
+{% set hdot = {"healthy":"🟢","degraded":"🟠","down":"🔴","unknown":"⚪"} %}
+{% set kind_label = {"service":"service","deployment":"workload","pod":"pod"} %}
+<div class="d-flex justify-content-between align-items-start">
+  <h6 class="mb-1">{{ d.symptom }}</h6>
+  <a class="btn btn-sm btn-outline-primary ms-2" href="{{ root }}ui/incidents/{{ d.incident_id }}/pptx">
+    ⬇️ Download RCA PPTX
+  </a>
+</div>
+<div class="small text-secondary mb-2">
+  {% if d.affected_anchor %}
+    {{ hdot.get(anchor_health, "⚪") }} {{ kind_label.get(d.anchor_kind, d.anchor_kind) }}
+    <code>{{ d.affected_anchor }}</code>
+    {% if anchor_reason %}— {{ anchor_reason }}{% endif %}
+  {% else %}
+    <code>{{ d.affected_resource }}</code>
+  {% endif %}
+  · <span class="sev-{{ d.severity }}">{{ sev_icon.get(d.severity, "⚪") }} {{ d.severity }}</span>
+  · {{ (d.created_at or "")[:19] }}
+</div>
+
+{% if pod_health %}
+<div class="mb-3">
+  <div class="fw-semibold small text-uppercase text-secondary mb-1">
+    Affected pods ({{ pod_health | length }})
+  </div>
+  {% for p in pod_health %}
+    <div class="small">
+      {{ hdot.get(p.health, "⚪") }} <code>{{ p.id }}</code>
+      {% if p.reason %}<span class="text-secondary">— {{ p.reason }}</span>{% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="fw-semibold small text-uppercase text-secondary mb-2">Ranked hypotheses</div>
+{% for h in d.hypotheses %}
+  {% set conf = h.confidence or 0 %}
+  {% set pct = (conf * 100) | round(0, 'floor') | int %}
+  {% set color = '#ff6b6b' if conf >= 0.75 else ('#ffb84d' if conf >= 0.5 else '#4dabf7') %}
+  <div class="mb-3">
+    <div class="d-flex justify-content-between align-items-center">
+      <span>{{ h.cause }}</span><span class="small text-secondary">{{ pct }}%</span>
+    </div>
+    <div class="conf-track w-100 my-1"><div class="conf-fill" style="width: {{ pct }}%; background: {{ color }};"></div></div>
+    <details class="mt-1"><summary class="small text-secondary">Evidence chain &amp; citations</summary>
+      <div class="mt-2">
+        {% for step in h.evidence_chain %}<div class="evidence-step small">{{ step }}</div>{% endfor %}
+        {% for c in h.citations %}
+          <div class="citation">[{{ c.kind }}] {{ c.source }} — {{ c.detail }}</div>
+          {% if c.kind == "change" and (c.actor or c.timestamp) %}
+            <div class="citation ms-3">
+              {% if c.actor %}
+                {% if c.is_automation %}🤖{% elif c.is_automation == false %}👤{% else %}❓{% endif %}
+                <strong>{{ c.actor }}</strong>{% if c.actor_source %} ({{ c.actor_source }}){% endif %}
+              {% endif %}
+              {% if c.timestamp %}· 🕒 {{ (c.timestamp|string)[:19] }}{% endif %}
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div></details>
+  </div>
+{% else %}
+  <div class="small text-secondary">No hypotheses.</div>
+{% endfor %}
+
+<div class="fw-semibold small text-uppercase text-secondary mt-3 mb-2">Impact &amp; dependencies</div>
+<div class="row g-2">
+  <div class="col-md-6">
+    <div class="border rounded-3 p-2 h-100">
+      <div class="small fw-semibold mb-1">⬆️ Upstream — possible causes</div>
+      <div class="small text-secondary mb-2" style="font-size:.75rem;">
+        Things <code>{{ d.affected_resource }}</code> depends on that are
+        themselves unhealthy (a failure here could be the root cause).
+      </div>
+      {% if d.upstream_unhealthy %}
+        {% for up in d.upstream_unhealthy %}
+          <div class="small"><code>{{ d.affected_resource }}</code> ⬅ <strong>{{ up }}</strong>
+            <span class="sev-down">(unhealthy)</span></div>
+        {% endfor %}
+      {% else %}
+        <div class="small text-secondary fst-italic">No unhealthy upstream dependencies in the current graph.</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="border rounded-3 p-2 h-100">
+      <div class="small fw-semibold mb-1">⬇️ Downstream — blast radius</div>
+      <div class="small text-secondary mb-2" style="font-size:.75rem;">
+        Services/jobs that depend on <code>{{ d.affected_resource }}</code>
+        and are therefore impacted while it is down.
+      </div>
+      {% if d.blast_radius %}
+        {% for dn in d.blast_radius %}
+          <div class="small"><code>{{ d.affected_resource }}</code> ➡ <strong>{{ dn }}</strong></div>
+        {% endfor %}
+      {% else %}
+        <div class="small text-secondary fst-italic">No downstream dependents in the current graph.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if d.related_incidents %}
+  <div class="fw-semibold small text-uppercase text-secondary mt-3 mb-1">Correlated with {{ d.related_incidents | length }} other incident(s)</div>
+  <div class="small text-secondary mb-1">Same failure signature on a different resource within the window — a pattern flag, not a verified shared cause.</div>
+  <code class="small">{{ d.related_incidents | join(", ") }}</code>
+{% endif %}
+
+{% if d.suggested_next_steps %}
+  <div class="fw-semibold small text-uppercase text-secondary mt-3 mb-2">Suggested next steps</div>
+  {% for s in d.suggested_next_steps %}
+    {% if s.startswith("No runbook source") %}<div class="small text-secondary fst-italic mb-2">{{ s }}</div>
+    {% elif s.startswith("Correlated:") %}<div class="alert alert-warning py-2 px-3 small mb-2">{{ s }}</div>
+    {% else %}<div class="alert alert-info py-2 px-3 small mb-2">{{ s }}</div>{% endif %}
+  {% endfor %}
+{% endif %}
+
+{% if d.evidence %}
+  <details class="mt-2"><summary class="small text-secondary">Full evidence ({{ d.evidence | length }} item(s))</summary>
+    <div class="mt-2">{% for e in d.evidence %}<div class="small mb-1"><span class="badge text-bg-dark">{{ e.category }}</span> {{ e.summary }}</div>{% endfor %}</div>
+  </details>
+{% endif %}

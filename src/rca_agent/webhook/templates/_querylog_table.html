@@ -1,0 +1,18 @@
+{% if entries %}
+<table class="table table-sm align-middle">
+  <thead><tr><th>Time</th><th>Query</th><th>Retriever</th><th class="text-center">Hits</th><th>Matched runbooks</th></tr></thead>
+  <tbody>
+  {% for e in entries %}
+    <tr>
+      <td class="small text-secondary">{{ (e.timestamp or "")[:19] }}</td>
+      <td>{{ e.query }}</td>
+      <td class="small text-secondary">{{ e.retriever }}</td>
+      <td class="text-center">{% if e.hit_count %}<span class="badge text-bg-success">{{ e.hit_count }}</span>{% else %}<span class="badge text-bg-secondary">0</span>{% endif %}</td>
+      <td class="small">{{ (e.hit_titles | join(", ")) or "—" }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="alert alert-secondary small">No runbook queries recorded yet.</div>
+{% endif %}

@@ -1,0 +1,30 @@
+<div class="row g-3 mb-2 align-items-end">
+  <div class="col-md-6">
+    <label class="form-label small text-secondary mb-1">Pod / resource</label>
+    <select class="form-select form-select-sm" id="pod-select"
+            onchange="updateGraph();">
+      <option value="">— show full graph —</option>
+      {% for p in pods %}
+      <option value="{{ p.id }}">{{ dot.get(p.health, "⚪") }} {{ p.display or p.id }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small text-secondary mb-1">Radius</label>
+    <select class="form-select form-select-sm" id="radius-select" onchange="updateGraph();">
+      <option>1</option><option selected>2</option><option>3</option>
+    </select>
+  </div>
+</div>
+<iframe id="graph-frame" class="graph-frame"
+        src="{{ root }}graph/view?with_pod_filter=false"></iframe>
+<script>
+  function updateGraph() {
+    var pod = document.getElementById('pod-select').value;
+    var r = document.getElementById('radius-select').value;
+    var base = "{{ root }}";
+    var url = pod ? (base + "graph/view/" + encodeURIComponent(pod) + "?radius=" + r + "&with_pod_filter=false")
+                  : (base + "graph/view?with_pod_filter=false");
+    document.getElementById('graph-frame').src = url;
+  }
+</script>

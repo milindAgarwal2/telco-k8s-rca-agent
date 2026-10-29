@@ -1,0 +1,28 @@
+{% set sev_icon = {"critical": "🔴", "warning": "🟠", "info": "🔵"} %}
+{% if incidents %}
+<table class="table table-sm align-middle">
+  <thead><tr><th>Severity</th><th>Symptom</th><th>Resource</th><th>Top cause</th>
+    <th style="width:150px">Confidence</th><th class="text-center">Rel.</th></tr></thead>
+  <tbody>
+  {% for i in incidents %}
+    {% set conf = (i.confidence or 0) %}
+    {% set pct = (conf * 100) | round(0, 'floor') | int %}
+    {% set color = '#ff6b6b' if conf >= 0.75 else ('#ffb84d' if conf >= 0.5 else '#4dabf7') %}
+    <tr class="row-clickable" hx-get="{{ root }}ui/incidents/{{ i.incident_id }}"
+        hx-target="#inc-detail" hx-swap="innerHTML">
+      <td class="sev-{{ i.severity }}">{{ sev_icon.get(i.severity, "⚪") }} {{ i.severity }}</td>
+      <td>{{ i.symptom }}</td>
+      <td><code>{{ i.affected_resource }}</code></td>
+      <td>{{ i.top_cause or "—" }}</td>
+      <td><div class="d-flex align-items-center gap-2">
+        <div class="conf-track"><div class="conf-fill" style="width: {{ pct }}%; background: {{ color }};"></div></div>
+        <span class="small">{{ pct }}%</span></div></td>
+      <td class="text-center">{% if i.related_count %}<span class="badge text-bg-secondary">{{ i.related_count }}</span>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<div class="small text-secondary">{{ incidents | length }} incident(s) · newest first · click a row to inspect</div>
+{% else %}
+<div class="alert alert-secondary small">No incidents yet. Either nothing is unhealthy, or (in demo/no-cluster mode) none posted to /webhook/alertmanager yet.</div>
+{% endif %}

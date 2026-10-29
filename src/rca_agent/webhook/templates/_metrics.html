@@ -1,0 +1,30 @@
+<div class="row g-3 mb-2">
+  {% set cards = [("Graph nodes", stats.nodes or 0), ("Graph edges", stats.edges or 0),
+                  ("Changes tracked", stats.changes or 0),
+                  ("Last rebuilt", (stats.last_rebuilt or "—")[:19])] %}
+  {% for label, value in cards %}
+  <div class="col-6 col-md-3">
+    <div class="metric-card p-3 h-100">
+      <div class="metric-label">{{ label }}</div>
+      <div class="metric-value">{{ value }}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% set kind_label = {"pod":"pods","service":"services","configmap":"configmaps",
+  "secret":"secrets","pvc":"PVCs","deployment":"deployments","replicaset":"replicasets",
+  "node":"worker nodes","network_function":"NFs","unknown":"unknown"} %}
+<div class="mb-3 small text-secondary">
+  {% if stats.by_kind %}
+  <span class="me-1">Nodes:</span>
+  {% for k, n in stats.by_kind.items() %}
+    <span class="badge text-bg-dark me-1">{{ n }} {{ kind_label.get(k, k) }}</span>
+  {% endfor %}
+  {% endif %}
+  {% if stats.edges_by_kind %}
+  <span class="ms-2 me-1">Edges:</span>
+  {% for k, n in stats.edges_by_kind.items() %}
+    <span class="badge text-bg-secondary me-1">{{ n }} {{ k }}</span>
+  {% endfor %}
+  {% endif %}
+</div>

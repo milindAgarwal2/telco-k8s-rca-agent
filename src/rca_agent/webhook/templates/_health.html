@@ -1,0 +1,13 @@
+<h5>Agent health</h5>
+<div class="row g-3 mb-3">
+  <div class="col-md-6">
+    {% if health_ok %}<div class="alert alert-success py-2 px-3 mb-0"><strong>/healthz</strong> — {{ health.status }} (version {{ health.version }})</div>
+    {% else %}<div class="alert alert-danger py-2 px-3 mb-0">/healthz unreachable</div>{% endif %}
+  </div>
+  <div class="col-md-6">
+    {% if ready_ok %}<div class="alert alert-success py-2 px-3 mb-0"><strong>/readyz</strong> — {{ ready.status }}</div>
+    {% else %}<div class="alert alert-warning py-2 px-3 mb-0"><strong>/readyz</strong> — {{ ready.status if ready else "unreachable" }}</div>{% endif %}
+  </div>
+</div>
+<h6>Raw <code>/graph/stats</code></h6>
+<pre class="border rounded-3 p-3 small">{{ stats_json }}</pre>
