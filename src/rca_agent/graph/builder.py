@@ -97,6 +97,7 @@ class GraphBuilder:
         self._add_services(g, kube, ns, sel)
         self._roll_up_workload_health(g)
         self._roll_up_service_health(g)
+        self._fix_orphan_nodes(g)
 
         from rca_agent.graph.dependency_graph import _now
         g.last_rebuilt = _now()
@@ -299,6 +300,34 @@ class GraphBuilder:
             if g.graph.nodes[node_id].get("kind") == NodeKind.service.value:
                 g.roll_up_service_health(node_id)
 
+    @staticmethod
+    def _fix_orphan_nodes(g: DependencyGraph) -> None:
+        """Backfill nodes that were implicitly created by ``add_edge`` and
+        never received their own ``upsert_node`` call.
+
+        NetworkX auto-creates a target node with NO attributes when an edge
+        references a not-yet-existing node. If the resource listing for that
+        node type was 403'd (e.g. cluster-scoped ``nodes``, daemonsets) or
+        the node is a stale reference, it stays kind-less. This post-build
+        sweep labels them so the UI shows a meaningful label/shape/health
+        instead of "kind: none / grey unknown".
+        """
+        for node_id in list(g.graph.nodes):
+            attrs = g.graph.nodes[node_id]
+            if attrs.get("kind") is None:
+                # Infer kind from the node id prefix pattern if possible.
+                kind = NodeKind.node.value  # most orphans are 403'd worker nodes
+                if "/" in node_id:
+                    prefix = node_id.split("/", 1)[0]
+                    _PREFIX_MAP = {"configmap": NodeKind.configmap.value,
+                                   "secret": NodeKind.secret.value,
+                                   "pvc": NodeKind.pvc.value,
+                                   "service": NodeKind.service.value}
+                    kind = _PREFIX_MAP.get(prefix, kind)
+                attrs["kind"] = kind
+                attrs.setdefault("health", Health.unknown.value)
+                attrs.setdefault("healthy", True)  # unknown, not broken
+
 
 # ---------------------------------------------------------------------------
 # Helpers for reading the kube object model (works with real + fake objects).
@@ -373,9 +402,20 @@ def _node_ready(node) -> bool:
 
 
 def _pod_health(pod) -> tuple[bool, str]:
-    """Return (healthy, reason) from pod phase + container statuses."""
+    """Return (healthy, reason) from pod phase + container statuses.
+
+    A ``Succeeded`` pod (a completed Job) is HEALTHY — its containers are
+    terminated normally, which means ``cs.ready == False`` is expected, not a
+    fault signal. Treating it as unhealthy is a false negative that turns
+    completed jobs red in the graph and triggers spurious incidents.
+    """
     status = getattr(pod, "status", None)
     phase = getattr(status, "phase", None)
+
+    # Completed jobs: phase Succeeded — this is a normal, healthy end state.
+    if phase == "Succeeded":
+        return True, "Completed"
+
     statuses = getattr(status, "container_statuses", None) or []
 
     for cs in statuses:

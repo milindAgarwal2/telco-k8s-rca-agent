@@ -91,21 +91,59 @@ def gather_evidence(state: ReasoningState, tools: QueryTools, cfg) -> ReasoningS
 
 
 def graph_walk(state: ReasoningState, graph: DependencyGraph) -> ReasoningState:
-    """Upstream = candidate causes; downstream = blast radius."""
+    """Upstream = candidate causes; downstream = blast radius.
+
+    Also resolves the service-anchored model (0.7.0): the stable anchor the
+    fault is attributed to (service > workload > pod) and the pods behind it.
+    """
     res = state.affected_resource
     if not res or not graph.node(res):
         return state
-    state.unhealthy_upstream = graph.unhealthy_upstream(res)
-    state.blast_radius = graph.downstream(res)
+
+    # Service-anchored resolution (0.7.0).
+    anchor = graph.anchor_of(res)
+    state.anchor_id = anchor["id"]
+    state.anchor_kind = anchor["kind"]
+    state.anchor_display = anchor["display"]
+    state.affected_pods = graph.pods_of_anchor(anchor["id"]) or [res]
+
+    # Phase 2: walk the dependency graph from the ANCHOR *and all its pods*,
+    # unioning the results. calls edges live on pods (pod --calls--> service),
+    # while the anchor is often the service/workload — so walking only the
+    # anchor would lose pod-level edges, and walking only the pod gives the
+    # asymmetric (always-empty-downstream) result. The union gives symmetric
+    # blast radius AND keeps the pod-level upstream dependencies.
+    walk_nodes = {anchor["id"], res}
+    walk_nodes.update(state.affected_pods)
+    walk_nodes = [n for n in walk_nodes if graph.node(n)]
+
+    up_set: list[str] = []
+    down_set: list[str] = []
+    for n in walk_nodes:
+        for u in graph.unhealthy_upstream(n):
+            if u not in up_set and u not in walk_nodes:
+                up_set.append(u)
+        for d in graph.downstream(n):
+            if d not in down_set and d not in walk_nodes:
+                down_set.append(d)
+    state.unhealthy_upstream = up_set
+    state.blast_radius = down_set
     for up in state.unhealthy_upstream:
         node = graph.node(up) or {}
         # When `up` is a DIRECT calls-edge target (not a multi-hop one), cite
         # exactly which env var / ConfigMap key produced the dependency
         # (see graph/builder.py::_add_call_edges) instead of a generic
-        # "upstream of" label.
-        edge_evidence = graph.calls_edge_evidence(res, up)
-        detail = f"upstream of {res} (via {edge_evidence})" if edge_evidence \
-            else "upstream of " + res
+        # "upstream of" label. The calls edge may originate from the anchor OR
+        # any of its pods — find whichever one holds it.
+        edge_evidence = None
+        src_of_edge = state.anchor_id or res
+        for n in walk_nodes:
+            ev = graph.calls_edge_evidence(n, up)
+            if ev:
+                edge_evidence, src_of_edge = ev, n
+                break
+        detail = f"upstream of {src_of_edge} (via {edge_evidence})" if edge_evidence \
+            else "upstream of " + (state.anchor_display or res)
         state.add_evidence(Evidence(
             category="graph",
             summary=f"Upstream dependency '{up}' is unhealthy "
@@ -163,13 +201,20 @@ def change_correlation(state: ReasoningState, tools: QueryTools, cfg,
     state.changes = kept
     for ch in kept:
         ts = _to_dt(ch.get("at"))
+        actor = ch.get("actor")
+        source = ch.get("actor_source")
+        # "by <actor> (<source>)" suffix when we know who made the change.
+        by = f" by {actor} ({source})" if actor else (f" ({source})" if source else "")
         state.add_evidence(Evidence(
             category="change",
-            summary=f"Recent {ch.get('type')} on {ch.get('object')}: {ch.get('detail', '')}",
+            summary=f"Recent {ch.get('type')} on {ch.get('object')}: "
+                    f"{ch.get('detail', '')}{by}",
             resource=ch.get("object"),
             timestamp=ts,
             citations=[Citation(kind="change", source=str(ch.get("object")),
-                                detail=ch.get("detail", ""), timestamp=ts)],
+                                detail=ch.get("detail", ""), timestamp=ts,
+                                actor=actor, actor_source=source,
+                                is_automation=ch.get("is_automation"))],
         ))
     return state
 
@@ -243,8 +288,11 @@ def hypothesize_and_rank(state: ReasoningState) -> ReasoningState:
         h.evidence_chain.append(
             f"{ch.get('type')} on {ch.get('object')}: {ch.get('detail', '')}"
             + ("" if correlated else " (not mounted by the affected pod)"))
-        h.citations.append(Citation(kind="change", source=str(ch.get("object")),
-                                    detail=ch.get("detail", "")))
+        h.citations.append(Citation(
+            kind="change", source=str(ch.get("object")),
+            detail=ch.get("detail", ""), timestamp=_to_dt(ch.get("at")),
+            actor=ch.get("actor"), actor_source=ch.get("actor_source"),
+            is_automation=ch.get("is_automation")))
 
     # 3) Unhealthy upstream (cascade causes).
     for up in state.unhealthy_upstream:

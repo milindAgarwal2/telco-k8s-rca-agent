@@ -15,6 +15,11 @@ class ReasoningState:
     alert: Alert
     namespace: str
     affected_resource: str | None = None
+    # Service-anchored model (0.7.0). Resolved in graph_walk from the graph.
+    anchor_id: str | None = None
+    anchor_kind: str | None = None
+    anchor_display: str | None = None
+    affected_pods: list[str] = field(default_factory=list)
     window_start: datetime | None = None
     window_end: datetime | None = None
 

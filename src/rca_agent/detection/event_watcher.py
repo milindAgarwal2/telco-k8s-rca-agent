@@ -96,38 +96,49 @@ class EventWatcher:
         self._flow_factory = flow_factory
         self._seen_uids: OrderedDict[str, None] = OrderedDict()
         self.incidents: list[IncidentReport] = []
+        # Status-based detection state: node_id -> consecutive-unhealthy count.
+        self._unhealthy_streak: dict[str, int] = {}
+        # node_ids already raised via status detection (cleared when healthy again).
+        self._status_incident_open: set[str] = set()
+        # Last poll's gate counters, surfaced by /debug/detection.
+        self.last_diag: dict = {}
 
     def poll_once(self) -> list[IncidentReport]:
         """Run one polling cycle. Returns any newly-created incident reports."""
         kube = getattr(self.builder, "_kube", None)
         if kube is None:
+            self.last_diag = {"status": "cluster client not built yet"}
             return []  # cluster client not built yet (first graph build still pending)
 
         ns = self.settings.namespace
         graph = self.builder.graph
-        # Ignore events whose lastTimestamp predates "a few poll cycles ago" —
-        # keeps a fresh watcher from flooding on ancient, no-longer-relevant
-        # events, while still reacting to a genuinely ongoing fault (K8s
-        # refreshes lastTimestamp on each recurrence of a live problem).
-        cutoff = _now() - timedelta(
-            seconds=max(60, self.settings.event_watch_interval_seconds * 4)
-        )
+        # Ignore events older than the configured window. Kubernetes stops
+        # refreshing lastTimestamp on a long-ongoing fault, so a too-short
+        # window makes the watcher blind to a still-active outage (see
+        # config.event_max_age_minutes).
+        cutoff = _now() - timedelta(minutes=max(1, self.settings.event_max_age_minutes))
 
         raw = _safe_list(lambda: kube.core.list_namespaced_event(ns), "events")
+        # Diagnostics counters for this cycle.
+        diag = {"events_seen": len(raw), "events_403": _EVENT_LIST_403["flag"],
+                "matched_fault_reason": 0, "dropped_stale": 0, "out_of_scope": 0,
+                "already_seen": 0, "event_incidents": 0, "status_incidents": 0}
         new_reports: list[IncidentReport] = []
         for raw_event in raw:
             kev = _to_kube_event(raw_event, ns)
-            # NB: FAULT_REASONS is a pydantic *field* (not a ClassVar) on
-            # KubeEvent, so it's only readable off an instance, not the class.
             if kev.reason not in kev.FAULT_REASONS:
                 continue
+            diag["matched_fault_reason"] += 1
             if kev.last_seen and kev.last_seen < cutoff:
+                diag["dropped_stale"] += 1
                 continue
             if not kev.name or not graph.node(kev.name):
+                diag["out_of_scope"] += 1
                 continue  # out of scope: not a node the graph is monitoring
 
             uid = _event_uid(raw_event, kev)
             if uid in self._seen_uids:
+                diag["already_seen"] += 1
                 continue
             self._remember(uid)
 
@@ -140,6 +151,15 @@ class EventWatcher:
                 )
                 continue
 
+            # Anchor dedup (0.7.0): if an incident for the same anchor is already
+            # open in the window, merge this pod into it instead of creating a
+            # duplicate (12 sibling pods failing the same way -> ONE incident).
+            merged = self._merge_into_open_anchor(report, kev.name)
+            if merged is not None:
+                logger.info("event-watcher: merged %s into anchor incident %s",
+                            kev.name, merged.incident_id)
+                continue
+
             top = report.top_hypothesis
             logger.info(
                 "event-watcher: auto-detected %s on %s -> incident %s (top=%s, confidence=%.2f)",
@@ -148,7 +168,60 @@ class EventWatcher:
             )
             self._store(report)
             new_reports.append(report)
+            diag["event_incidents"] += 1
+
+        # Fix B: status-based detection, independent of fresh events.
+        new_reports.extend(self._detect_from_status(graph, ns, diag))
+
+        diag["unhealthy_pods"] = sum(1 for _ in self._unhealthy_graph_pods(graph))
+        self.last_diag = diag
         return new_reports
+
+    def _unhealthy_graph_pods(self, graph):
+        """Yield (node_id, reason) for pod nodes currently marked unhealthy."""
+        from rca_agent.graph.dependency_graph import NodeKind
+        for nid, attrs in graph.graph.nodes(data=True):
+            if attrs.get("kind") != NodeKind.pod.value:
+                continue
+            if attrs.get("healthy") is False or attrs.get("health") == "down":
+                yield nid, attrs.get("health_reason", "unhealthy")
+
+    def _detect_from_status(self, graph, ns: str, diag: dict) -> list[IncidentReport]:
+        """Raise an incident for a pod that stays unhealthy across N consecutive
+        rebuilds, even with no fresh K8s event. Survives Kubernetes aging
+        events out from under a still-broken pod."""
+        if not self.settings.status_detection_enabled:
+            return []
+        threshold = max(1, self.settings.status_unhealthy_rebuilds)
+        current_unhealthy = dict(self._unhealthy_graph_pods(graph))
+
+        # Reset streaks / clear open flags for pods that recovered.
+        for nid in list(self._unhealthy_streak):
+            if nid not in current_unhealthy:
+                self._unhealthy_streak.pop(nid, None)
+                self._status_incident_open.discard(nid)
+
+        out: list[IncidentReport] = []
+        for nid, reason in current_unhealthy.items():
+            self._unhealthy_streak[nid] = self._unhealthy_streak.get(nid, 0) + 1
+            if self._unhealthy_streak[nid] < threshold:
+                continue
+            if nid in self._status_incident_open:
+                continue  # already raised; don't re-fire until it recovers
+            self._status_incident_open.add(nid)
+            alert = _status_to_alert(nid, reason, ns)
+            try:
+                report = self._flow_factory().run(alert)
+            except Exception:
+                logger.exception("event-watcher: status reasoning failed for %s", nid)
+                continue
+            logger.info(
+                "event-watcher: status-detected persistently-unhealthy %s (%s) "
+                "-> incident %s", nid, reason, report.incident_id)
+            self._store(report)
+            out.append(report)
+            diag["status_incidents"] += 1
+        return out
 
     def _remember(self, uid: str) -> None:
         self._seen_uids[uid] = None
@@ -161,6 +234,28 @@ class EventWatcher:
         timeline and correlation pool as auto-detected ones. Safe to call for
         every report the webhook produces."""
         self._store(report)
+
+    def _merge_into_open_anchor(self, report: IncidentReport,
+                                pod_name: str) -> IncidentReport | None:
+        """If a recent stored incident shares this report's anchor, merge the
+        triggering pod into it (extend ``affected_pods``) and return it; else
+        None. Anchor dedup (0.7.0): 12 sibling pods failing the same way become
+        ONE anchor incident, not 12. Only applies to service/workload anchors —
+        a pod-anchored incident (bare Job) has no siblings to merge."""
+        anchor = report.affected_anchor
+        if not anchor or report.anchor_kind not in ("service", "deployment"):
+            return None
+        window = max(60, self.settings.incident_correlation_window_minutes * 60)
+        for other in reversed(self.incidents):
+            if other.affected_anchor != anchor:
+                continue
+            delta = abs((report.created_at - other.created_at).total_seconds())
+            if delta > window:
+                continue
+            if pod_name and pod_name not in other.affected_pods:
+                other.affected_pods.append(pod_name)
+            return other
+        return None
 
     def _store(self, report: IncidentReport) -> None:
         self.incidents.append(report)
@@ -180,6 +275,13 @@ class EventWatcher:
         linked_this_call = [report]
         for other in self.incidents:
             if other.incident_id == report.incident_id:
+                continue
+            # Phase 3 (0.7.0): same-anchor siblings are already merged by
+            # anchor-dedup, so correlation now links DIFFERENT anchors sharing
+            # a failure signature (e.g. 5 different services all failing probes
+            # at once) — a genuine cross-service pattern, not double-counting.
+            if report.affected_anchor and other.affected_anchor and \
+                    other.affected_anchor == report.affected_anchor:
                 continue
             if other.affected_resource == report.affected_resource:
                 continue  # same resource -> not a "different resource" match
@@ -214,12 +316,28 @@ def _signature(report: IncidentReport) -> str | None:
     Returns None when there's nothing to compare (no hypothesis yet, or the
     resource name isn't actually inside the cause text).
     """
+def _signature(report: IncidentReport) -> str | None:
+    """A resource/anchor-independent fingerprint of the top hypothesis.
+
+    Blanks out the affected resource, the anchor display, and each affected pod
+    name inside the top hypothesis's ``cause``, so e.g. "<svc-A> failing health
+    probe (HTTP 500)" and "<svc-B> failing health probe (HTTP 500)" compare
+    equal while "<svc-A> OOMKilled" does not. This lets correlation (0.7.0)
+    link DIFFERENT anchors that are failing the same way. Returns None when
+    there's nothing to compare.
+    """
     top = report.top_hypothesis
-    if top is None or not report.affected_resource:
+    if top is None:
         return None
-    if report.affected_resource not in top.cause:
-        return None
-    return top.cause.replace(report.affected_resource, "<RESOURCE>")
+    cause = top.cause
+    tokens = [report.affected_resource, report.affected_anchor]
+    tokens += list(report.affected_pods or [])
+    replaced = False
+    for tok in tokens:
+        if tok and tok in cause:
+            cause = cause.replace(tok, "<RESOURCE>")
+            replaced = True
+    return cause if replaced else None
 
 
 def _apply_correlation_note(report: IncidentReport,
@@ -255,15 +373,42 @@ def _now() -> datetime:
 
 def _safe_list(call, label: str) -> list:
     """Tolerate a 403/connection error on the event list — never crash the loop."""
+    _EVENT_LIST_403["flag"] = False
     try:
         result = call()
         return getattr(result, "items", None) or []
     except Exception as exc:  # noqa: BLE001
         status = getattr(exc, "status", None)
         reason = getattr(exc, "reason", None) or type(exc).__name__
+        if status == 403 or "forbidden" in str(reason).lower():
+            _EVENT_LIST_403["flag"] = True
         logger.warning("event-watcher: skipping %s: cannot list (%s %s)",
                        label, status, reason)
         return []
+
+
+# Set by _safe_list each cycle so poll_once's diagnostics can report whether
+# the event list was forbidden (a 403) vs. genuinely empty.
+_EVENT_LIST_403: dict = {"flag": False}
+
+
+def _status_to_alert(node_id: str, reason: str, namespace: str):
+    """Synthesize an Alert for a persistently-unhealthy graph pod (Fix B:
+    status-based detection, no fresh K8s event required)."""
+    return Alert(
+        status="firing",
+        labels={
+            "alertname": "PodPersistentlyUnhealthy",
+            "namespace": namespace,
+            "pod": node_id,
+            "severity": "critical",
+        },
+        annotations={"description":
+                     f"Pod {node_id} has been unhealthy across multiple graph "
+                     f"rebuilds: {reason} (status-based detection; no fresh "
+                     f"Kubernetes event required)"},
+        startsAt=_now(),
+    )
 
 
 def _event_uid(raw_event, kev: KubeEvent) -> str:

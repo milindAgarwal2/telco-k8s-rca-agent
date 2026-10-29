@@ -21,6 +21,12 @@ class Citation(BaseModel):
     source: str  # pod name, PromQL query, runbook page, etc.
     detail: str = ""
     timestamp: datetime | None = None
+    # For change citations: who made the edit and whether that actor is an
+    # automation. Populated from Kubernetes managedFields (see
+    # query_tools._change). None for non-change citations.
+    actor: str | None = None          # raw managedFields manager, e.g. "helm"
+    actor_source: str | None = None   # classified label, e.g. "human (kubectl)"
+    is_automation: bool | None = None
 
 
 class Evidence(BaseModel):
@@ -54,6 +60,13 @@ class IncidentReport(BaseModel):
     # Symptom: what fired, where, when.
     symptom: str
     affected_resource: str | None = None
+    # Service-anchored model (0.7.0): the stable entity the fault is attributed
+    # to (a Service, else owning workload, else the pod itself) and the pods
+    # that are the evidence behind it. affected_resource stays = the anchor's
+    # display (or the pod when pod-anchored) for backward compatibility.
+    affected_anchor: str | None = None        # anchor node id
+    anchor_kind: str | None = None            # "service" | "deployment" | "pod"
+    affected_pods: list[str] = Field(default_factory=list)
     namespace: str | None = None
     severity: Severity = Severity.warning
     detected_at: datetime | None = None
@@ -61,6 +74,10 @@ class IncidentReport(BaseModel):
     # Reasoning outputs.
     hypotheses: list[Hypothesis] = Field(default_factory=list)
     blast_radius: list[str] = Field(default_factory=list)
+    # Upstream dependencies currently unhealthy — the "possible causes" side of
+    # the graph walk (downstream ``blast_radius`` is the impact side). Each is a
+    # resource this one depends on (``calls`` edge) that is itself unhealthy.
+    upstream_unhealthy: list[str] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
     suggested_next_steps: list[str] = Field(default_factory=list)
 

@@ -47,7 +47,11 @@ def _store(events):
 
 
 def _make_watcher(events):
-    cfg = Settings(cluster_enabled=True, namespace="open5gs")
+    # status_detection_enabled=False keeps these tests focused on EVENT
+    # behavior; the status-based detector has its own tests in
+    # test_detection_fixes_0_6_1.py.
+    cfg = Settings(cluster_enabled=True, namespace="open5gs",
+                   status_detection_enabled=False)
     builder = GraphBuilder(cfg, kube_client=fk.FakeKubeClient(_store(events)))
     builder.rebuild()  # populate the graph so the watcher has nodes to scope against
     flow = ReasoningFlow(cfg, graph=builder.graph, builder=builder)

@@ -111,6 +111,10 @@ class StubQueryTools(QueryTools):
                 "namespace": namespace,
                 "detail": "resources.limits.memory lowered 2Gi -> 512Mi",
                 "at": (_now() - timedelta(minutes=4)).isoformat(),
+                "actor": "kubectl-edit",
+                "actor_source": "human (kubectl)",
+                "is_automation": False,
+                "operation": "Update",
             }
         ]
 
@@ -300,20 +304,20 @@ class KubeQueryTools(QueryTools):
             name = _obj_name(cm)
             if _is_ha_bookkeeping(name):
                 continue
-            ts = _managed_fields_time(cm)
+            ts, mgr, op = _managed_fields_actor(cm)
             if ts and ts >= cutoff:
                 changes.append(_change("configmap_update", name, namespace,
-                                       "configmap updated", ts))
+                                       "configmap updated", ts, mgr, op))
         for sec in _safe_list(
             lambda: kube.core.list_namespaced_secret(namespace), "secrets"
         ):
             name = _obj_name(sec)
             if _is_ha_bookkeeping(name):
                 continue
-            ts = _managed_fields_time(sec)
+            ts, mgr, op = _managed_fields_actor(sec)
             if ts and ts >= cutoff:
                 changes.append(_change("secret_update", name, namespace,
-                                       "secret updated", ts))
+                                       "secret updated", ts, mgr, op))
 
         # 2) New ReplicaSet revisions (a rollout/image change creates a new RS).
         for rs in _safe_list(
@@ -325,21 +329,24 @@ class KubeQueryTools(QueryTools):
                 images = _pod_template_images(rs)
                 detail = ("rollout/new ReplicaSet"
                           + (f" (images: {', '.join(images)})" if images else ""))
+                _t, mgr, op = _managed_fields_actor(rs)
                 changes.append(_change("rollout", owner_name or _obj_name(rs),
-                                       namespace, detail, created))
+                                       namespace, detail, created, mgr, op))
 
         # 3) Deployments/StatefulSets whose spec changed recently (generation bump
         #    reflected in a recent managedFields update on the spec).
         for dep in _safe_list(
             lambda: kube.apps.list_namespaced_deployment(namespace), "deployments"
         ):
-            ts = _last_modified(dep)
+            ts, mgr, op = _managed_fields_actor(dep)
+            if ts is None:
+                ts = _last_modified(dep)
             if ts and ts >= cutoff:
                 images = _pod_template_images(dep)
                 detail = ("deployment spec updated"
                           + (f" (images: {', '.join(images)})" if images else ""))
                 changes.append(_change("deployment_update", _obj_name(dep),
-                                       namespace, detail, ts))
+                                       namespace, detail, ts, mgr, op))
 
         # De-dup by (type, object) keeping the most recent, then sort newest first.
         dedup: dict[tuple, dict] = {}
@@ -468,24 +475,6 @@ def _last_modified(obj):
     return _to_dt(_creation_ts(obj))
 
 
-def _managed_fields_time(obj):
-    """Newest ``managedFields[].time`` ONLY — no creation-time fallback.
-
-    For change-correlation we want the genuine last-edit time. Falling back to
-    the creation timestamp (as ``_last_modified`` does) would make long-lived
-    objects with no managedFields time look "recently changed" and flood the
-    report with irrelevant candidates. Returns None when there is no real edit
-    time, so such objects are simply skipped.
-    """
-    meta = getattr(obj, "metadata", None)
-    times = []
-    for mf in getattr(meta, "managed_fields", None) or []:
-        t = _to_dt(getattr(mf, "time", None))
-        if t:
-            times.append(t)
-    return max(times) if times else None
-
-
 # Substrings of objects that are HA / control-plane bookkeeping (leader
 # election, TLS supervisor state, kvdb replication). These are rewritten
 # constantly by operators and are never an application-config root cause, so we
@@ -517,9 +506,62 @@ def _pod_template_images(workload) -> list[str]:
     return [getattr(c, "image", "") for c in containers if getattr(c, "image", None)]
 
 
-def _change(ctype: str, obj: str, ns: str, detail: str, at: datetime) -> dict:
+def _managed_fields_actor(obj) -> tuple[datetime | None, str | None, str | None]:
+    """Return ``(time, manager, operation)`` for the NEWEST managedFields entry.
+
+    ``manager`` is the tool/controller that made the last edit (e.g.
+    ``kubectl-edit``, ``helm``, ``argocd-application-controller``) -- the
+    human-vs-automation signal. ``operation`` is ``Update``/``Apply``. All None
+    when the object has no managedFields.
+    """
+    meta = getattr(obj, "metadata", None)
+    newest_t: datetime | None = None
+    manager: str | None = None
+    operation: str | None = None
+    for mf in getattr(meta, "managed_fields", None) or []:
+        t = _to_dt(getattr(mf, "time", None))
+        if t and (newest_t is None or t > newest_t):
+            newest_t = t
+            manager = getattr(mf, "manager", None)
+            operation = getattr(mf, "operation", None)
+    return newest_t, manager, operation
+
+
+# Prefix -> (human-readable source, is_automation). First match wins; the raw
+# manager string is always kept too, so classification never hides the truth.
+_ACTOR_RULES = [
+    ("kubectl", ("human (kubectl)", False)),
+    ("oc", ("human (oc)", False)),
+    ("helm", ("Helm", True)),
+    ("argocd", ("GitOps (Argo CD)", True)),
+    ("flux", ("GitOps (Flux)", True)),
+    ("kustomize", ("GitOps (Kustomize)", True)),
+    ("kube-controller-manager", ("controller", True)),
+]
+
+
+def _classify_actor(manager: str | None) -> tuple[str, bool | None]:
+    """Map a managedFields manager to ``(source_label, is_automation)``.
+
+    ``is_automation`` is True/False for recognized tools, None when unknown.
+    """
+    if not manager:
+        return "unknown", None
+    m = manager.lower()
+    for prefix, (label, auto) in _ACTOR_RULES:
+        if m.startswith(prefix):
+            return label, auto
+    if m.endswith(("-controller", "-operator")) or "operator" in m or "controller" in m:
+        return "controller/operator", True
+    return manager, None  # unknown: show verbatim
+
+
+def _change(ctype: str, obj: str, ns: str, detail: str, at: datetime,
+            manager: str | None = None, operation: str | None = None) -> dict:
+    source, is_automation = _classify_actor(manager)
     return {"type": ctype, "object": obj, "namespace": ns, "detail": detail,
-            "at": at.isoformat()}
+            "at": at.isoformat(), "actor": manager, "actor_source": source,
+            "is_automation": is_automation, "operation": operation}
 
 
 def get_query_tools(cluster_enabled: bool, kube_client=None,
