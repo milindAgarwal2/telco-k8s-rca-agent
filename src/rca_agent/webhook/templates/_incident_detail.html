@@ -16,6 +16,11 @@
     <code>{{ d.affected_resource }}</code>
   {% endif %}
   · <span class="sev-{{ d.severity }}">{{ sev_icon.get(d.severity, "⚪") }} {{ d.severity }}</span>
+  {% if d.status == "inactive" %}
+    · <span class="badge text-bg-success">✅ inactive</span>{% if d.resolved_at %} <span class="text-secondary">resolved {{ (d.resolved_at|string)[:19] }}</span>{% endif %}
+  {% else %}
+    · <span class="badge text-bg-warning">🟠 active</span>
+  {% endif %}
   · {{ (d.created_at or "")[:19] }}
 </div>
 
@@ -118,6 +123,6 @@
 
 {% if d.evidence %}
   <details class="mt-2"><summary class="small text-secondary">Full evidence ({{ d.evidence | length }} item(s))</summary>
-    <div class="mt-2">{% for e in d.evidence %}<div class="small mb-1"><span class="badge text-bg-dark">{{ e.category }}</span> {{ e.summary }}</div>{% endfor %}</div>
+    <div class="mt-2">{% for e in d.evidence %}<div class="small mb-1"><span class="badge text-bg-dark">{{ e.category }}</span>{% if e.timestamp %} <span class="text-secondary">🕒 {{ (e.timestamp|string)[:19] }}</span>{% endif %} {{ e.summary }}</div>{% endfor %}</div>
   </details>
 {% endif %}

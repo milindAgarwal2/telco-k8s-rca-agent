@@ -69,9 +69,15 @@ def gather_evidence(state: ReasoningState, tools: QueryTools, cfg) -> ReasoningS
         ))
 
     for ev in tools.recent_events(res, ns, since_minutes=30):
+        # Prefix the human-readable time so the event's "when" is visible
+        # everywhere the summary is shown (incident detail full-evidence block,
+        # logs, PPTX). ASCII-safe (no em dash) for the RHEL non-UTF-8 shell.
+        when = str(ev.last_seen)[:19].replace("T", " ") if ev.last_seen else ""
+        summary = f"[{when}] {ev.reason}: {ev.message}" if when \
+            else f"{ev.reason}: {ev.message}"
         state.add_evidence(Evidence(
             category="event",
-            summary=f"{ev.reason}: {ev.message}",
+            summary=summary,
             resource=ev.name,
             timestamp=ev.last_seen,
             citations=[Citation(kind="event", source=ev.name or res, detail=ev.reason,
