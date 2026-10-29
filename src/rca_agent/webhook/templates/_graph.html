@@ -1,13 +1,21 @@
 <div class="row g-3 mb-2 align-items-end">
-  <div class="col-md-6">
-    <label class="form-label small text-secondary mb-1">Pod / resource</label>
-    <select class="form-select form-select-sm" id="pod-select"
-            onchange="updateGraph();">
-      <option value="">— show full graph —</option>
-      {% for p in pods %}
-      <option value="{{ p.id }}">{{ dot.get(p.health, "⚪") }} {{ p.display or p.id }}</option>
-      {% endfor %}
+  <div class="col-md-3">
+    <label class="form-label small text-secondary mb-1">Node type</label>
+    <select class="form-select form-select-sm" id="kind-select"
+            hx-get="{{ root }}ui/graph/nodes" hx-target="#picker-wrap" hx-swap="innerHTML"
+            hx-trigger="change" name="kind">
+      <option value="node">Node (K8s node)</option>
+      <option value="service">Service</option>
+      <option value="pod" selected>Pod</option>
     </select>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label small text-secondary mb-1">
+      Search &amp; select <span class="text-secondary">(type to filter)</span>
+    </label>
+    <div id="picker-wrap">
+      {% include "_graph_picker.html" %}
+    </div>
   </div>
   <div class="col-md-2">
     <label class="form-label small text-secondary mb-1">Radius</label>
@@ -15,16 +23,48 @@
       <option>1</option><option selected>2</option><option>3</option>
     </select>
   </div>
+  <div class="col-md-1">
+    <button class="btn btn-sm btn-outline-secondary w-100" onclick="showFull();"
+            title="Show the full dependency graph">Full</button>
+  </div>
 </div>
 <iframe id="graph-frame" class="graph-frame"
         src="{{ root }}graph/view?with_pod_filter=false"></iframe>
 <script>
+  var __selectedNodeId = "";
+
+  // Called from the picker partial's script when it is (re)loaded, so switching
+  // node type clears a stale selection and shows the full graph again.
+  window.__clearNodeSelection = function () {
+    __selectedNodeId = "";
+    var inp = document.getElementById('node-input');
+    if (inp) inp.value = "";
+    showFull();
+  };
+
+  function onNodePick() {
+    var inp = document.getElementById('node-input');
+    var map = window.__nodeMap || {};
+    var id = map[inp.value];
+    // Only act once the typed text exactly matches a known option (i.e. the
+    // user picked an entry), so we don't reload on every keystroke.
+    if (id) {
+      __selectedNodeId = id;
+      updateGraph();
+    }
+  }
+
   function updateGraph() {
-    var pod = document.getElementById('pod-select').value;
     var r = document.getElementById('radius-select').value;
     var base = "{{ root }}";
-    var url = pod ? (base + "graph/view/" + encodeURIComponent(pod) + "?radius=" + r + "&with_pod_filter=false")
-                  : (base + "graph/view?with_pod_filter=false");
+    var url = __selectedNodeId
+      ? (base + "graph/view/" + encodeURIComponent(__selectedNodeId) + "?radius=" + r + "&with_pod_filter=false")
+      : (base + "graph/view?with_pod_filter=false");
     document.getElementById('graph-frame').src = url;
+  }
+
+  function showFull() {
+    __selectedNodeId = "";
+    document.getElementById('graph-frame').src = "{{ root }}graph/view?with_pod_filter=false";
   }
 </script>

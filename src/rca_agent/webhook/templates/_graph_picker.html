@@ -1,0 +1,23 @@
+{# Searchable picker for one node kind. Swapped in by HTMX when the Node/
+   Service/Pod selector changes. The <input list> gives native substring
+   search as the user types; each datalist option's label is the display name
+   and we keep a display->id map so selecting resolves to the node id that
+   /graph/view/{id} needs. #}
+<input class="form-select form-select-sm" id="node-input" list="node-options"
+       placeholder="Type to search {{ kind }} name… ({{ nodes | length }} available)"
+       autocomplete="off" oninput="onNodePick();">
+<datalist id="node-options">
+  {% for n in nodes %}
+  <option value="{{ dot.get(n.health, '⚪') }} {{ n.display or n.id }}"></option>
+  {% endfor %}
+</datalist>
+<script>
+  // display-label -> node id, for the current kind.
+  window.__nodeMap = {
+    {% for n in nodes %}
+    {{ (dot.get(n.health, '⚪') ~ ' ' ~ (n.display or n.id)) | tojson }}: {{ n.id | tojson }}{% if not loop.last %},{% endif %}
+    {% endfor %}
+  };
+  // A freshly-swapped picker clears any prior selection.
+  if (window.__clearNodeSelection) window.__clearNodeSelection();
+</script>

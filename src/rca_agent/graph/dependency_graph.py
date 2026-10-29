@@ -205,18 +205,31 @@ class DependencyGraph:
     def pods(self) -> list[dict]:
         """All pod nodes, sorted by display name — for the viz dropdown.
 
-        Returns ``[{id, display, health, component}]`` so the UI can list and
-        group pods without re-walking the whole graph.
+        Thin wrapper over :meth:`node_summaries` (kept for back-compat with
+        the ``/graph/pods`` endpoint and existing callers).
+        """
+        return self.node_summaries(kind=NodeKind.pod.value)
+
+    def node_summaries(self, kind: str | None = None) -> list[dict]:
+        """Node rows for the viz picker, sorted by display name.
+
+        ``kind=None`` returns EVERY node (the "Any" picker option); otherwise
+        only nodes of that :class:`NodeKind` value (e.g. ``"node"``/``"service"``
+        /``"pod"``). Each row is ``{id, display, health, kind, component}`` so
+        the UI can list, search and group without re-walking the whole graph.
         """
         out = []
         for nid, attrs in self._g.nodes(data=True):
-            if attrs.get("kind") == NodeKind.pod.value:
-                out.append({
-                    "id": nid,
-                    "display": attrs.get("display", nid),
-                    "health": attrs.get("health", "unknown"),
-                    "component": attrs.get("component"),
-                })
+            nkind = attrs.get("kind", "unknown")
+            if kind is not None and nkind != kind:
+                continue
+            out.append({
+                "id": nid,
+                "display": attrs.get("display", nid),
+                "health": attrs.get("health", "unknown"),
+                "kind": nkind,
+                "component": attrs.get("component"),
+            })
         out.sort(key=lambda p: str(p["display"]).lower())
         return out
 
