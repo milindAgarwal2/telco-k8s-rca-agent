@@ -16,6 +16,14 @@
 #   ./deploy-cobra.sh --no-logs       # don't tail logs at the end
 #   ./deploy-cobra.sh --skip-verify   # skip sha256 verification (not recommended)
 #
+#   Pick exactly which images to use (tarballs must be present in this dir):
+#   ./deploy-cobra.sh --app-tag 0.8.1                      # use rca-agent:0.8.1
+#   ./deploy-cobra.sh --with-llm --app-tag 0.8.1 --sidecar-tag 0.8.0
+#       # agent 0.8.1 + sidecar 0.8.0 (the agent and sidecar version often
+#       #  differ — the sidecar changes far less often).
+#   If --sidecar-tag is omitted with --with-llm, the NEWEST
+#   rca-agent-sidecar-*.tar.gz present is auto-detected.
+#
 # LLM sidecar prerequisites (only for --with-llm):
 #   - the sidecar image tarball  (rca-agent-sidecar-<tag>.tar.gz) in this dir, AND
 #   - the GGUF model file at $LLM_GGUF_HOST (default ~/models/model.gguf).
@@ -26,14 +34,13 @@
 set -euo pipefail
 
 IMAGE_NAME="${IMAGE_NAME:-rca-agent}"
-IMAGE_TAG="${IMAGE_TAG:-0.8.0}"
-IMAGE_REF="${IMAGE_NAME}:${IMAGE_TAG}"
+IMAGE_TAG="${IMAGE_TAG:-0.8.1}"
 CONTAINER_NAME="${CONTAINER_NAME:-rca-agent}"
 
 # LLM sidecar config.
 SIDECAR_IMAGE_NAME="${SIDECAR_IMAGE_NAME:-rca-agent-sidecar}"
-SIDECAR_IMAGE_TAG="${SIDECAR_IMAGE_TAG:-$IMAGE_TAG}"
-SIDECAR_IMAGE_REF="${SIDECAR_IMAGE_NAME}:${SIDECAR_IMAGE_TAG}"
+# Empty = auto-detect the newest rca-agent-sidecar-*.tar.gz next to this script.
+SIDECAR_IMAGE_TAG="${SIDECAR_IMAGE_TAG:-}"
 SIDECAR_NAME="${SIDECAR_NAME:-rca-agent-llm}"
 LLM_PORT="${LLM_PORT:-8090}"
 LLM_GGUF_HOST="${LLM_GGUF_HOST:-$HOME/models/model.gguf}"
@@ -46,22 +53,41 @@ RUN_UID_GID="${RUN_UID_GID:-1744:1744}"
 KUBECONFIG_HOST="${KUBECONFIG_HOST:-$HOME/.kube/config}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE_TARBALL="${IMAGE_TARBALL:-$SCRIPT_DIR/rca-agent-${IMAGE_TAG}.tar.gz}"
-SHA_FILE="${SHA_FILE:-${IMAGE_TARBALL}.sha256}"
-SIDECAR_TARBALL="${SIDECAR_TARBALL:-$SCRIPT_DIR/rca-agent-sidecar-${SIDECAR_IMAGE_TAG}.tar.gz}"
 
 SKIP_VERIFY=0
 TAIL_LOGS=1
 WITH_LLM=0
-for arg in "$@"; do
-  case "$arg" in
+# Flags: --app-tag <v> picks the agent image tag; --sidecar-tag <v> picks the
+# LLM sidecar image tag (defaults to whatever sidecar tarball is present).
+while [ $# -gt 0 ]; do
+  case "$1" in
     --skip-verify) SKIP_VERIFY=1 ;;
     --no-logs)     TAIL_LOGS=0 ;;
     --with-llm)    WITH_LLM=1 ;;
+    --app-tag)     IMAGE_TAG="$2"; shift ;;
+    --app-tag=*)   IMAGE_TAG="${1#*=}" ;;
+    --sidecar-tag)   SIDECAR_IMAGE_TAG="$2"; shift ;;
+    --sidecar-tag=*) SIDECAR_IMAGE_TAG="${1#*=}" ;;
     -h|--help)     grep '^#' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) echo "WARN: unknown arg '$arg' (ignored)" >&2 ;;
+    *) echo "WARN: unknown arg '$1' (ignored)" >&2 ;;
   esac
+  shift
 done
+
+# Auto-detect the sidecar tag from the newest tarball if not given explicitly.
+if [ "$WITH_LLM" -eq 1 ] && [ -z "$SIDECAR_IMAGE_TAG" ]; then
+  _sc="$(ls -1 "$SCRIPT_DIR"/rca-agent-sidecar-*.tar.gz 2>/dev/null | sort -V | tail -1 || true)"
+  if [ -n "$_sc" ]; then
+    SIDECAR_IMAGE_TAG="$(basename "$_sc" | sed -E 's/^rca-agent-sidecar-(.*)\.tar\.gz$/\1/')"
+  fi
+fi
+
+# Derive refs + tarball paths AFTER tag selection.
+IMAGE_REF="${IMAGE_NAME}:${IMAGE_TAG}"
+SIDECAR_IMAGE_REF="${SIDECAR_IMAGE_NAME}:${SIDECAR_IMAGE_TAG}"
+IMAGE_TARBALL="${IMAGE_TARBALL:-$SCRIPT_DIR/rca-agent-${IMAGE_TAG}.tar.gz}"
+SHA_FILE="${SHA_FILE:-${IMAGE_TARBALL}.sha256}"
+SIDECAR_TARBALL="${SIDECAR_TARBALL:-$SCRIPT_DIR/rca-agent-sidecar-${SIDECAR_IMAGE_TAG}.tar.gz}"
 
 log() { printf '\033[1;34m[deploy]\033[0m %s\n' "$*"; }
 err() { printf '\033[1;31m[error]\033[0m %s\n' "$*" >&2; }
