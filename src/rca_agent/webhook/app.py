@@ -243,6 +243,22 @@ def graph_neighborhood(node_id: str, radius: int = 1) -> dict:
     return _graph_builder.graph.neighborhood(node_id, radius=radius)
 
 
+def _incident_index() -> dict:
+    """Map node_id -> incident_id so the graph can link an unhealthy pod to its
+    incident (Task 2). Prefers ACTIVE incidents; a pod in affected_pods (or the
+    incident's affected_resource) points at that incident. Newest wins."""
+    index: dict[str, str] = {}
+    for r in _event_watcher.incidents:  # oldest->newest; newest overwrites
+        if r.status != "active":
+            continue
+        targets = list(r.affected_pods or [])
+        if r.affected_resource:
+            targets.append(r.affected_resource)
+        for t in targets:
+            index[t] = r.incident_id
+    return index
+
+
 @app.get("/graph/view", response_class=HTMLResponse)
 def graph_view(hide_orphans: bool = True, with_pod_filter: bool = True) -> HTMLResponse:
     """Interactive HTML visualization of the full dependency graph.
@@ -258,7 +274,8 @@ def graph_view(hide_orphans: bool = True, with_pod_filter: bool = True) -> HTMLR
     html = render_graph_html(_graph_builder.graph,
                              title=f"{settings.app_name} — dependency graph",
                              hide_orphans=hide_orphans,
-                             with_pod_filter=with_pod_filter)
+                             with_pod_filter=with_pod_filter,
+                             incident_index=_incident_index())
     return HTMLResponse(content=html)
 
 
@@ -275,7 +292,8 @@ def graph_view_node(node_id: str, radius: int = 2,
                             status_code=404)
     html = render_neighborhood_html(_graph_builder.graph, node_id, radius=radius,
                                     hide_orphans=hide_orphans,
-                                    with_pod_filter=with_pod_filter)
+                                    with_pod_filter=with_pod_filter,
+                                    incident_index=_incident_index())
     return HTMLResponse(content=html)
 
 

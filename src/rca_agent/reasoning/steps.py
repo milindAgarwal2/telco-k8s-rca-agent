@@ -286,10 +286,16 @@ def hypothesize_and_rank(state: ReasoningState) -> ReasoningState:
     # 2) Recent changes correlated in time. A change the affected pod actually
     #    consumes (correlated=True) is a plausible cause; an uncorrelated change
     #    (no mount link) gets much lower weight so it cannot outrank the fault.
+    #    Enrich the cause with the CONCRETE failure this change led to (e.g.
+    #    "... -> ImagePullBackOff"), so the headline names the actual error, not
+    #    just a generic "rollout". The failure label is derived from the fault/
+    #    probe signals already gathered for this incident.
+    concrete_failure = _concrete_failure_label(state)
     for ch in state.changes:
         correlated = bool(ch.get("correlated"))
-        h = ensure(f"change:{ch.get('object')}",
-                   f"recent {ch.get('type')} to {ch.get('object')}")
+        base_cause = f"recent {ch.get('type')} to {ch.get('object')}"
+        cause = f"{base_cause} -> {concrete_failure}" if concrete_failure else base_cause
+        h = ensure(f"change:{ch.get('object')}", cause)
         h.confidence += 0.30 if correlated else 0.05
         h.evidence_chain.append(
             f"{ch.get('type')} on {ch.get('object')}: {ch.get('detail', '')}"
@@ -323,6 +329,23 @@ def hypothesize_and_rank(state: ReasoningState) -> ReasoningState:
     state.hypotheses = sorted(candidates.values(),
                               key=lambda x: x.confidence, reverse=True)
     return state
+
+def _concrete_failure_label(state) -> str | None:
+    """The concrete failure this incident is really about, for enriching a
+    change hypothesis's cause (e.g. a rollout "-> ImagePullBackOff"). Prefers an
+    explicit fault reason (OOMKilled/CrashLoopBackOff/ImagePullBackOff/...) seen
+    in the gathered evidence; falls back to "readiness probe failing" when the
+    only signal is a probe failure. Returns None if neither is present."""
+    fault_reasons = ("OOMKilled", "CrashLoopBackOff", "ImagePullBackOff",
+                     "ErrImagePull", "Evicted")
+    for ev in state.evidence:
+        for r in fault_reasons:
+            if r in ev.summary:
+                return r
+    if _detect_probe_failure(state) is not None:
+        return "readiness probe failing"
+    return None
+
 
 
 def _detect_probe_failure(state) -> tuple | None:

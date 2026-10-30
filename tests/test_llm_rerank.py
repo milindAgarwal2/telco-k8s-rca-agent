@@ -130,3 +130,67 @@ def test_validate_order_helper():
     assert lr._validate_order([0, 1], 3) is None
     assert lr._validate_order([0, 1, 3], 3) is None
     assert lr._validate_order("nope", 3) is None
+
+
+# ---- anti-echo guard: an explanation that just repeats the cause is dropped --
+
+def test_echoed_explanation_is_dropped(monkeypatch):
+    rep = _report()
+    # Model echoes the cause text back as the "explanation" for each id.
+    _mock_sidecar(monkeypatch, json.dumps({
+        "order": [0, 1, 2],
+        "explanations": {"0": "recent rollout to upf",            # exact echo
+                         "1": "upf-0 ImagePullBackOff",           # exact echo
+                         "2": "upf-0 failing health probe"},      # exact echo
+    }))
+    out = lr.llm_rerank(rep, _cfg())
+    # No "LLM explanation:" line should have been attached (all were echoes).
+    for h in out.hypotheses:
+        assert not any(s.startswith("LLM explanation:") for s in h.evidence_chain)
+
+
+def test_real_explanation_is_kept(monkeypatch):
+    rep = _report()
+    _mock_sidecar(monkeypatch, json.dumps({
+        "order": [0, 1, 2],
+        "explanations": {
+            "0": "The rollout set image bad:v0 which cannot be pulled, so the pod stays down.",
+            "1": "Kubernetes cannot pull the configured image tag.",
+            "2": "The container is up but failing its readiness check."},
+    }))
+    out = lr.llm_rerank(rep, _cfg())
+    assert any(s.startswith("LLM explanation:") for s in out.hypotheses[0].evidence_chain)
+
+
+def test_is_echo_helper():
+    assert lr._is_echo("recent rollout to upf", "recent rollout to upf") is True
+    assert lr._is_echo("recent rollout to upf!", "recent rollout to upf") is True
+    assert lr._is_echo(
+        "The rollout set image bad:v0 which cannot be pulled by the kubelet.",
+        "recent rollout to upf") is False
+    assert lr._is_echo("", "anything") is True
+
+
+# ---- deterministic: change hypothesis cause names the concrete error --------
+
+def test_change_cause_enriched_with_concrete_error():
+    """With the LLM OFF, a change-correlated hypothesis's cause should name the
+    concrete failure (e.g. '-> ImagePullBackOff'), not just 'recent rollout'."""
+    from rca_agent.config import Settings as S
+    from rca_agent.eval.cases import _imagepull_store
+    from rca_agent.eval.fake_cluster import FakeKubeClient
+    from rca_agent.graph.builder import GraphBuilder
+    from rca_agent.models.alert import Alert
+    from rca_agent.reasoning.flow import ReasoningFlow
+
+    cfg = S(cluster_enabled=True, reasoning_mode="extractive", namespace="open5gs")
+    b = GraphBuilder(cfg, kube_client=FakeKubeClient(_imagepull_store()))
+    b.rebuild()
+    flow = ReasoningFlow(cfg, graph=b.graph, builder=b)
+    rep = flow.run(Alert(status="firing",
+                         labels={"alertname": "PodImagePullBackOff",
+                                 "pod": "amf-0", "namespace": "open5gs"}))
+    change_causes = [h.cause for h in rep.hypotheses if h.cause.startswith("recent ")]
+    # If a change hypothesis exists, it must carry the concrete error.
+    for c in change_causes:
+        assert "->" in c and "ImagePullBackOff" in c, c

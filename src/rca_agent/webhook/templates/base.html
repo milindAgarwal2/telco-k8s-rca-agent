@@ -56,5 +56,27 @@
     <div class="text-secondary small">Loading…</div>
   </div>
 </div>
+
+<script>
+  // Called from the embedded graph iframe (visualize.py) when an unhealthy pod
+  // is clicked: switch to the Incidents tab, then load that incident's detail.
+  window.openIncidentFromGraph = function (incidentId) {
+    if (!incidentId) return;
+    var root = "{{ root }}";
+    // Activate the Incidents nav tab (visual state) and load its body.
+    var tabs = document.querySelectorAll('#tabs .nav-link');
+    tabs.forEach(function (e) { e.classList.remove('active'); });
+    var incTab = Array.prototype.find.call(tabs, function (e) {
+      return (e.getAttribute('hx-get') || '').indexOf('ui/tab/incidents') !== -1;
+    });
+    if (incTab) incTab.classList.add('active');
+    // Load the Incidents tab body, then (after it swaps in) load the detail.
+    htmx.ajax('GET', root + 'ui/tab/incidents', {target: '#tabbody', swap: 'innerHTML'})
+      .then(function () {
+        htmx.ajax('GET', root + 'ui/incidents/' + encodeURIComponent(incidentId),
+                  {target: '#inc-detail', swap: 'innerHTML'});
+      });
+  };
+</script>
 </body>
 </html>

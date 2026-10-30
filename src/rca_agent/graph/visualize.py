@@ -87,26 +87,62 @@ def _node_title(node_id: str, attrs: dict) -> str:
     for key in ("health", "health_reason", "phase", "replicas"):
         if attrs.get(key) not in (None, ""):
             lines.append(f"{key}: {attrs[key]}")
+    # Age + restarts (pods) — the Task-3 detail, also surfaced on click.
+    age = _format_age(attrs.get("pod_created_at"))
+    if age:
+        lines.append(f"age: {age}")
+    if attrs.get("restart_count") not in (None, ""):
+        lines.append(f"restarts: {attrs['restart_count']}")
     return "<br>".join(lines)
+
+
+def _format_age(created_at) -> str | None:
+    """Human age like '3d 4h' / '12m' from an ISO creation timestamp. None-safe."""
+    if not created_at:
+        return None
+    from datetime import datetime, timezone
+    try:
+        s = str(created_at).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(s)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return None
+    secs = (datetime.now(timezone.utc) - dt).total_seconds()
+    if secs < 0:
+        return "just now"
+    d, rem = divmod(int(secs), 86400)
+    h, rem = divmod(rem, 3600)
+    m = rem // 60
+    if d:
+        return f"{d}d {h}h"
+    if h:
+        return f"{h}h {m}m"
+    return f"{m}m"
 
 
 def render_graph_html(graph: DependencyGraph, title: str = "RCA dependency graph",
                       height: str = "750px", hide_orphans: bool = True,
-                      with_pod_filter: bool = True) -> str:
+                      with_pod_filter: bool = True,
+                      incident_index: dict | None = None) -> str:
     """Return a standalone interactive HTML document for the whole graph.
 
     ``hide_orphans`` (default True) drops edgeless nodes (typically unmounted
     secrets/configmaps) that just clutter the view.
     ``with_pod_filter`` (default True) injects a pod picker that reloads the
     page scoped to the selected pod's neighborhood.
+    ``incident_index`` maps node_id -> incident_id so clicking an unhealthy pod
+    can open its incident (Task 2).
     """
     return _render(graph, list(graph.graph.nodes), title, height, hide_orphans,
-                   selected_pod=None, with_pod_filter=with_pod_filter)
+                   selected_pod=None, with_pod_filter=with_pod_filter,
+                   incident_index=incident_index)
 
 
 def render_neighborhood_html(graph: DependencyGraph, node_id: str, radius: int = 2,
                              height: str = "750px", hide_orphans: bool = False,
-                             with_pod_filter: bool = True) -> str:
+                             with_pod_filter: bool = True,
+                             incident_index: dict | None = None) -> str:
     """Return interactive HTML for the neighborhood around ``node_id``.
 
     Orphans are kept here by default — in a neighborhood you usually *want* to
@@ -116,7 +152,7 @@ def render_neighborhood_html(graph: DependencyGraph, node_id: str, radius: int =
     ids = [n["id"] for n in nb["nodes"]]
     return _render(graph, ids, f"Neighborhood of {node_id} (r={radius})", height,
                    hide_orphans, selected_pod=node_id, radius=radius,
-                   with_pod_filter=with_pod_filter)
+                   with_pod_filter=with_pod_filter, incident_index=incident_index)
 
 
 # Dot color used in the dropdown labels, mirroring node health colors.
@@ -185,7 +221,8 @@ def _pod_filter_html(graph: DependencyGraph, selected_pod: str | None,
 
 def _render(graph: DependencyGraph, node_ids, title: str, height: str,
             hide_orphans: bool = False, selected_pod: str | None = None,
-            radius: int = 2, with_pod_filter: bool = False) -> str:
+            radius: int = 2, with_pod_filter: bool = False,
+            incident_index: dict | None = None) -> str:
     try:
         from pyvis.network import Network  # type: ignore
     except ImportError as exc:  # pragma: no cover - import guard
@@ -302,7 +339,98 @@ def _render(graph: DependencyGraph, node_ids, title: str, height: str,
             html = html.replace("<body>", "<body>" + filter_html, 1)
         else:
             html = filter_html + html
+
+    # Click handler + info panel (Tasks 2 & 3): clicking a node shows its age +
+    # restart count (and health); clicking an UNHEALTHY pod that has an incident
+    # navigates the parent dashboard to that incident on the Incidents tab.
+    click_html = _click_handler_html(graph, node_ids, incident_index or {})
+    if "</body>" in html:
+        html = html.replace("</body>", click_html + "</body>")
+    else:
+        html += click_html
     return html
+
+
+def _click_handler_html(graph: DependencyGraph, node_ids, incident_index: dict) -> str:
+    """A node-info panel + vis.js click handler.
+
+    On click: fill a fixed panel with the node's kind/health/age/restarts. If
+    the node is an unhealthy pod with a known incident, also offer (and
+    auto-trigger) navigation to that incident on the parent dashboard's
+    Incidents tab via ``window.parent`` (the graph is embedded in an iframe).
+    """
+    import json as _json
+
+    info: dict[str, dict] = {}
+    g = graph.graph
+    for nid in node_ids:
+        a = dict(g.nodes.get(nid, {}))
+        info[str(nid)] = {
+            "display": str(a.get("display", nid)),
+            "kind": a.get("kind"),
+            "health": a.get("health"),
+            "reason": a.get("health_reason"),
+            "age": _format_age(a.get("pod_created_at")),
+            "restarts": a.get("restart_count"),
+            "incident": incident_index.get(nid),
+            "unhealthy": a.get("healthy") is False or a.get("health") == "down",
+        }
+    info_js = _json.dumps(info)
+
+    return """
+    <div id="node-info" style="position:fixed;bottom:10px;right:10px;z-index:1000;
+         display:none;background:rgba(255,255,255,0.97);border:1px solid #ccc;
+         border-radius:6px;padding:10px 12px;font-family:sans-serif;font-size:12px;
+         color:#222;box-shadow:0 1px 4px rgba(0,0,0,0.25);max-width:320px;"></div>
+    <script type="text/javascript">
+      (function () {
+        var INFO = __NODE_INFO__;
+        function esc(s){return String(s==null?'':s).replace(/[&<>]/g,function(c){
+          return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+        function wire() {
+          if (typeof network === 'undefined') { return setTimeout(wire, 100); }
+          var panel = document.getElementById('node-info');
+          network.on('click', function (params) {
+            if (!params.nodes || !params.nodes.length) { panel.style.display='none'; return; }
+            var id = params.nodes[0];
+            var d = INFO[id]; if (!d) { panel.style.display='none'; return; }
+            var html = '<b>' + esc(d.display) + '</b><br>kind: ' + esc(d.kind);
+            if (d.health) html += '<br>health: ' + esc(d.health);
+            if (d.reason) html += '<br>reason: ' + esc(d.reason);
+            if (d.age != null) html += '<br>age: ' + esc(d.age);
+            if (d.restarts != null) html += '<br>restarts: ' + esc(d.restarts);
+            if (d.incident) {
+              var url = '/ui/incidents/' + encodeURIComponent(d.incident);
+              html += '<br><a href="#" id="go-incident">\u2192 open incident ' +
+                      esc(d.incident) + '</a>';
+            }
+            panel.innerHTML = html;
+            panel.style.display = 'block';
+            // Unhealthy pod with an incident -> navigate the PARENT dashboard to
+            // the Incidents tab and open this incident (graph is in an iframe).
+            if (d.incident && d.unhealthy) {
+              openIncident(d.incident);
+            }
+            var a = document.getElementById('go-incident');
+            if (a) a.addEventListener('click', function(e){e.preventDefault();
+              openIncident(d.incident);});
+          });
+        }
+        function openIncident(incidentId) {
+          try {
+            if (window.parent && window.parent !== window &&
+                typeof window.parent.openIncidentFromGraph === 'function') {
+              window.parent.openIncidentFromGraph(incidentId);
+              return;
+            }
+          } catch (e) { /* cross-origin / not embedded */ }
+          // Fallback: open the incident detail directly.
+          window.open('/ui/incidents/' + encodeURIComponent(incidentId), '_blank');
+        }
+        wire();
+      })();
+    </script>
+    """.replace("__NODE_INFO__", info_js)
 
 
 def _title_label_html(title: str) -> str:

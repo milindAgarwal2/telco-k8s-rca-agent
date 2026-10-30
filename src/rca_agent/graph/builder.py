@@ -195,10 +195,17 @@ class GraphBuilder:
         ):
             name = pod.metadata.name
             healthy, reason = _pod_health(pod)
+            # Age + restarts for the graph's click-to-inspect panel (Task 3).
+            created_at = getattr(pod.metadata, "creation_timestamp", None)
+            restart_count = 0
+            for _cs in (getattr(pod.status, "container_statuses", None) or []):
+                restart_count += int(getattr(_cs, "restart_count", 0) or 0)
             g.upsert_node(name, NodeKind.pod, healthy=healthy,
                           health=(Health.healthy if healthy else Health.down).value,
                           health_reason=reason,
-                          phase=getattr(pod.status, "phase", None))
+                          phase=getattr(pod.status, "phase", None),
+                          pod_created_at=str(created_at) if created_at else None,
+                          restart_count=restart_count)
 
             # runs_on node
             node_name = getattr(pod.spec, "node_name", None)
