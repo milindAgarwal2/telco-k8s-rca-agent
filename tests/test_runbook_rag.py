@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from rca_agent.models.alert import Alert
+from rca_agent.models.incident import Evidence, Hypothesis
 from rca_agent.rag.local_store import (
     LocalRunbookStore,
     _normalize_pdf_text,
@@ -23,6 +25,8 @@ from rca_agent.rag.runbook_retriever import (
     _snippet,
     get_runbook_retriever,
 )
+from rca_agent.reasoning.state import ReasoningState
+from rca_agent.reasoning.steps import _enrich_runbook_query, build_next_steps
 
 UPF_OOM_TEXT = (
     "UPF pods are getting OOMKilled frequently.\n\n"
@@ -356,3 +360,70 @@ def test_runbook_queries_endpoint_reports_stats_and_entries(api_client: TestClie
 
     r = api_client.get("/runbook-queries")
     assert r.json()["stats"]["total"] == 0
+
+
+# ---- runbook query enrichment (concrete failure reason injection) -----------
+
+IMAGEPULL_RUNBOOK_TEXT = (
+    "Pod Is in ImagePullBackOff or ErrImagePull Status\n\n"
+    "A pod reports ImagePullBackOff when the kubelet cannot pull the container "
+    "image. Verify the image name and tag, check the registry is reachable, and "
+    "confirm the imagePullSecrets reference valid credentials. ErrImagePull "
+    "usually precedes the backoff."
+)
+
+
+def _imagepull_state() -> ReasoningState:
+    """An ImagePull incident whose TOP hypothesis is a *probe-failure* label
+    (the exact miscorrelation case): the pod is in ImagePullBackOff but the
+    ranked #1 cause reads "readiness probe failing", so the base query shares
+    no vocabulary with the ImagePull runbook section."""
+    alert = Alert(labels={"alertname": "KubePodNotReady", "pod": "rca-demo-imagepull-75fbbb5677-kthpw"})
+    state = ReasoningState(alert=alert, namespace="plantx2avzwcspgc-y-oc-consp-301",
+                           affected_resource="rca-demo-imagepull-75fbbb5677-kthpw")
+    state.add_evidence(Evidence(
+        category="event",
+        summary="[14:02] ImagePullBackOff: Back-off pulling image \"bad/image:nope\"",
+        resource="rca-demo-imagepull-75fbbb5677-kthpw",
+    ))
+    state.hypotheses = [Hypothesis(
+        cause="rca-demo-imagepull-75fbbb5677-kthpw failing health probe (readiness probe failing)",
+        confidence=0.8,
+    )]
+    return state
+
+
+def test_enrich_runbook_query_injects_concrete_failure_reason():
+    state = _imagepull_state()
+    base = state.hypotheses[0].cause
+    enriched = _enrich_runbook_query(base, state)
+    # Base symptom label preserved, but the concrete rare error token is now present.
+    assert base in enriched
+    assert "ImagePullBackOff" in enriched
+    # The base query on its own lacked the distinctive token.
+    assert "ImagePullBackOff" not in base
+
+
+def test_enrich_runbook_query_no_duplicate_when_reason_already_present():
+    state = _imagepull_state()
+    base = "rca-demo pod ImagePullBackOff loop"  # already names the reason
+    enriched = _enrich_runbook_query(base, state)
+    # Not appended a second time.
+    assert enriched.count("ImagePullBackOff") == 1
+
+
+def test_build_next_steps_correlates_imagepull_runbook_after_enrichment(store: LocalRunbookStore):
+    """End-to-end: the probe-failure-labelled ImagePull incident now retrieves
+    the ImagePullBackOff runbook section, which a bare top-cause query missed."""
+    store.add_document("imagepull.md", IMAGEPULL_RUNBOOK_TEXT)
+    store.add_document("upf-oom.md", UPF_OOM_TEXT)
+    retriever = LocalRunbookRetriever(store)
+    state = _imagepull_state()
+
+    # Baseline: the un-enriched top-cause query does NOT surface the ImagePull doc first.
+    base_hits = retriever.retrieve(state.hypotheses[0].cause)
+    assert not base_hits or base_hits[0].title != "imagepull.md"
+
+    # After enrichment via build_next_steps, the ImagePull runbook is found.
+    out = build_next_steps(state, retriever, top_k=3)
+    assert any("imagepull.md" in step for step in out.suggested_next_steps)

@@ -408,6 +408,48 @@ NO_RUNBOOK_SOURCE_NOTE = (
 )
 
 
+# Concrete K8s failure reasons we want present in the runbook query verbatim.
+# These are rare, distinctive tokens that appear in both cluster events and
+# well-written runbook headings, so including them makes keyword/TF-IDF
+# retrieval land on the right section regardless of which hypothesis ranked #1.
+_RUNBOOK_QUERY_FAULT_REASONS = (
+    "OOMKilled", "CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull",
+    "Evicted", "FailedScheduling", "FailedMount",
+)
+
+
+def _enrich_runbook_query(base: str, state) -> str:
+    """Augment the runbook query with the concrete failure reason + event reasons.
+
+    The base query is the top hypothesis's cause, which can be a symptom label
+    ("... readiness probe failing") that doesn't share vocabulary with the
+    runbook section describing the *actual* fault (e.g. an "ImagePullBackOff"
+    section). We append:
+
+      * the concrete failure label (``_concrete_failure_label``), and
+      * any distinctive K8s fault reasons seen verbatim in the gathered
+        evidence summaries,
+
+    so the distinctive, rare error token (``ImagePullBackOff`` etc.) is in the
+    query and the correct runbook section matches. Terms are de-duplicated and
+    only appended when not already present, so the base cause still dominates.
+    """
+    extra: list[str] = []
+
+    def _add(term: str | None) -> None:
+        if term and term.lower() not in base.lower() and term not in extra:
+            extra.append(term)
+
+    _add(_concrete_failure_label(state))
+    for ev in getattr(state, "evidence", []):
+        summary = getattr(ev, "summary", "") or ""
+        for reason in _RUNBOOK_QUERY_FAULT_REASONS:
+            if reason in summary:
+                _add(reason)
+
+    return f"{base} {' '.join(extra)}".strip() if extra else base
+
+
 def build_next_steps(state: ReasoningState, retriever: RunbookRetriever,
                      top_k: int, query_log: QueryLog | None = None) -> ReasoningState:
     """Pull human-facing next steps from runbooks via RAG (recommendations only).
@@ -424,7 +466,8 @@ def build_next_steps(state: ReasoningState, retriever: RunbookRetriever,
     exactly the "nothing matched this" signal worth tracking.
     """
     top = state.hypotheses[0] if state.hypotheses else None
-    query = top.cause if top else f"{state.alert.name} {state.affected_resource or ''}"
+    base = top.cause if top else f"{state.alert.name} {state.affected_resource or ''}"
+    query = _enrich_runbook_query(base, state)
     hits = retriever.retrieve(query, top_k=top_k)
     if query_log is not None:
         query_log.record(query, type(retriever).__name__, [h.title for h in hits])
