@@ -13,8 +13,6 @@ from __future__ import annotations
 
 import re
 
-from openpyxl import load_workbook
-
 from rca_agent.impact.models import ServiceArea, ServiceAreaImpact
 
 _SECTION_SHEET = "20-section map"
@@ -165,6 +163,12 @@ def build_impacts(wb) -> tuple[list[ServiceAreaImpact], list[ServiceArea]]:
 
 
 def load_workbook_impacts(path: str) -> tuple[list[ServiceAreaImpact], list[ServiceArea]]:
+    # Import openpyxl lazily: this module is imported transitively by
+    # models.incident (hence the whole app), so a missing openpyxl must NOT
+    # crash startup -- only an actual workbook load should require it. The
+    # index factory catches the ImportError and treats the feature as inert.
+    from openpyxl import load_workbook
+
     wb = load_workbook(path, data_only=True, read_only=True)
     try:
         return build_impacts(wb)
