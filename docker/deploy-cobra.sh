@@ -13,6 +13,9 @@
 # Usage:
 #   ./deploy-cobra.sh                 # agent only (extractive), verify+load+run+logs
 #   ./deploy-cobra.sh --with-llm      # ALSO start the llama.cpp sidecar + enable LLM rerank
+#   ./deploy-cobra.sh --with-llm --semantic  # ALSO enable the opt-in semantic
+#       # runbook RAG (embeddings over uploaded runbooks). Needs the LLM sidecar
+#       # (--with-llm) live; without it, falls back to the extractive retriever.
 #   ./deploy-cobra.sh --no-logs       # don't tail logs at the end
 #   ./deploy-cobra.sh --skip-verify   # skip sha256 verification (not recommended)
 #
@@ -72,6 +75,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKIP_VERIFY=0
 TAIL_LOGS=1
 WITH_LLM=0
+WITH_SEMANTIC=0
 # Flags: --app-tag <v> picks the agent image tag; --sidecar-tag <v> picks the
 # LLM sidecar image tag (defaults to whatever sidecar tarball is present).
 while [ $# -gt 0 ]; do
@@ -79,6 +83,7 @@ while [ $# -gt 0 ]; do
     --skip-verify) SKIP_VERIFY=1 ;;
     --no-logs)     TAIL_LOGS=0 ;;
     --with-llm)    WITH_LLM=1 ;;
+    --semantic)    WITH_SEMANTIC=1 ;;
     --app-tag)     IMAGE_TAG="$2"; shift ;;
     --app-tag=*)   IMAGE_TAG="${1#*=}" ;;
     --sidecar-tag)   SIDECAR_IMAGE_TAG="$2"; shift ;;
@@ -184,7 +189,22 @@ else
   log "no service-area map at $SERVICE_AREA_MAP_HOST (feature inert; agent runs normally)."
 fi
 
-log "starting $CONTAINER_NAME (ns=$RCA_NAMESPACE port=$RCA_PORT mode=$RCA_REASONING_MODE) ..."
+# Semantic runbook RAG is OPT-IN and only meaningful with the LLM sidecar live
+# (it synthesizes the retrieved hits). Enabled only when BOTH --semantic is
+# passed AND reasoning_mode ended up "llm" (sidecar came up). Otherwise the
+# agent falls back to the extractive retriever by construction.
+RCA_SEMANTIC_FLAG="false"
+if [ "$WITH_SEMANTIC" -eq 1 ]; then
+  if [ "$RCA_REASONING_MODE" = "llm" ]; then
+    log "semantic runbook RAG ENABLED (--semantic + LLM sidecar live)."
+    RCA_SEMANTIC_FLAG="true"
+  else
+    err "--semantic requested but the LLM sidecar is not live; semantic RAG"
+    err "needs the sidecar -> falling back to extractive retriever."
+  fi
+fi
+
+log "starting $CONTAINER_NAME (ns=$RCA_NAMESPACE port=$RCA_PORT mode=$RCA_REASONING_MODE semantic=$RCA_SEMANTIC_FLAG) ..."
 docker run -d \
   --name "$CONTAINER_NAME" \
   --restart unless-stopped \
@@ -195,6 +215,7 @@ docker run -d \
   -e RCA_NAMESPACE="$RCA_NAMESPACE" \
   -e RCA_NF_SELECTOR="$RCA_NF_SELECTOR" \
   -e RCA_REASONING_MODE="$RCA_REASONING_MODE" \
+  -e RCA_RUNBOOK_RAG_SEMANTIC="$RCA_SEMANTIC_FLAG" \
   -e RCA_LLM_BASE_URL="http://127.0.0.1:${LLM_PORT}" \
   -e RCA_PORT="$RCA_PORT" \
   -e KUBECONFIG=/kube/config \

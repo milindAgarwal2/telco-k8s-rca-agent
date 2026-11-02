@@ -133,6 +133,38 @@ def _call_sidecar(cfg: Settings, system: str, user: str) -> str | None:
         return None
 
 
+def sidecar_available(cfg: Settings) -> bool:
+    """Cheap liveness probe for the llama.cpp sidecar.
+
+    Returns True only when the sidecar is BOTH opted-in (``reasoning_mode ==
+    "llm"``) AND reachable on ``llm_base_url``. Used to gate the semantic
+    runbook RAG: semantic retrieval only pays off when an LLM can then
+    synthesize the hits, so with no live sidecar we fall back to the extractive
+    retriever. Never raises -- any error means "not available".
+
+    The llama.cpp server exposes a GET ``/health`` endpoint; we try that first
+    and treat any 2xx as live. A short timeout keeps startup/first-incident
+    latency bounded when nothing is listening.
+    """
+    if cfg.reasoning_mode != "llm":
+        return False
+    import httpx
+
+    base = cfg.llm_base_url.rstrip("/")
+    # llama.cpp: GET /health -> {"status": "ok"}. Fall back to /v1/models for
+    # other OpenAI-compatible servers that don't implement /health.
+    for path in ("/health", "/v1/models"):
+        try:
+            resp = httpx.get(base + path, timeout=min(cfg.llm_timeout_seconds, 3.0))
+            if resp.is_success:
+                return True
+        except Exception:  # noqa: BLE001, S112 - unreachable/timeout -> try next
+            continue
+    logger.info("LLM sidecar not reachable at %s; semantic RAG will fall back to extractive",
+                base)
+    return False
+
+
 def llm_rerank(report: IncidentReport, cfg: Settings) -> IncidentReport:
     """Reorder + explain the report's hypotheses via the sidecar. Returns the
     SAME report object; on any failure it is returned with the original order

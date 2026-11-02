@@ -37,6 +37,12 @@ class RunbookChunk:
     doc_name: str
     chunk_index: int
     text: str
+    # Structure-aware extras (default extraction). Markdown tables and
+    # extracted image file paths that belong to the same page/section as this
+    # chunk, so a retriever can surface them WITH the text hit and a citation.
+    # Defaulted so older stored JSON (without these keys) still loads.
+    tables: list[str] = field(default_factory=list)
+    images: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -162,16 +168,39 @@ class LocalRunbookStore:
         os.replace(tmp, self.path)  # atomic on the same filesystem
 
     # ---- mutation ------------------------------------------------------
-    def add_document(self, name: str, text: str) -> RunbookDocument:
+    def add_document(
+        self, name: str, text: str, images: list[str] | None = None
+    ) -> RunbookDocument:
         """Chunk and store ``text`` under ``name``. Re-uploading the same
         name is a safe overwrite (previous chunks are replaced, not
-        duplicated)."""
+        duplicated).
+
+        Structure-aware extras (default): any markdown TABLE blocks inside a
+        chunk are captured on that chunk (so a tabular remedy is surfaced as a
+        table, not flattened prose). Extracted ``images`` (page diagrams) are
+        attached at the document level -- associated with the first chunk so a
+        retriever can cite them -- since markdown image placement is not always
+        reliable enough to pin to a specific chunk.
+        """
         pieces = chunk_text(text)
+        images = images or []
         with self._lock:
-            self._state.chunks[name] = [
-                RunbookChunk(doc_name=name, chunk_index=i, text=p)
-                for i, p in enumerate(pieces)
-            ]
+            chunks: list[RunbookChunk] = []
+            for i, p in enumerate(pieces):
+                tables = _extract_markdown_tables(p)
+                chunks.append(
+                    RunbookChunk(
+                        doc_name=name,
+                        chunk_index=i,
+                        text=p,
+                        tables=tables,
+                        # Attach all document images to the first chunk so they
+                        # are retrievable with a citation; cheaper and more
+                        # honest than guessing which chunk a diagram belongs to.
+                        images=images if i == 0 else [],
+                    )
+                )
+            self._state.chunks[name] = chunks
             doc = RunbookDocument(
                 name=name,
                 added_at=datetime.now(timezone.utc).isoformat(),
@@ -180,8 +209,8 @@ class LocalRunbookStore:
             )
             self._state.documents[name] = doc
             self._save()
-        logger.info("runbook store: added '%s' (%d chunks, %d chars)",
-                   name, len(pieces), len(text))
+        logger.info("runbook store: added '%s' (%d chunks, %d chars, %d images)",
+                   name, len(pieces), len(text), len(images))
         return doc
 
     def delete_document(self, name: str) -> dict:
@@ -296,27 +325,122 @@ def _normalize_pdf_text(raw: str) -> str:
 
 
 def extract_text(filename: str, content: bytes) -> str:
-    """Best-effort plain-text extraction for an uploaded runbook file.
+    """Backward-compatible wrapper: return just the extracted text/markdown.
 
-    ``.txt``/``.md`` are decoded directly. ``.pdf`` uses ``pypdf`` (pure
-    Python, no compiled/native dependency, unlike PyMuPDF or Spire.PDF) --
-    deliberately the lighter choice given this image already carries
-    Streamlit's own dependency weight. PDF output is passed through
-    :func:`_normalize_pdf_text` to strip layout artifacts (soft-wrap arrows,
-    page boilerplate, literal example-output tables) so chunks and snippets
-    read as prose rather than mangled tables.
+    Prefer :func:`extract_document` (returns text + extracted image paths) for
+    the upload path. This wrapper is kept for callers/tests that only want the
+    text body.
+    """
+    text, _images = extract_document(filename, content, asset_dir=None)
+    return text
+
+
+def extract_document(
+    filename: str, content: bytes, asset_dir: str | None = None
+) -> tuple[str, list[str]]:
+    """Structure-aware extraction (DEFAULT). Returns ``(text, image_paths)``.
+
+    ``.txt``/``.md`` are decoded directly (no images). ``.pdf`` has two paths:
+
+    * **Structure-aware (default, preferred)** -- ``pymupdf4llm`` renders the
+      PDF to **markdown**, preserving TABLES and the ``kubectl`` command blocks
+      that the old flat-text path mangled (the root cause of the bad
+      ``#chunk42`` answer). When ``asset_dir`` is given, page IMAGES are also
+      extracted to disk and their paths returned, so results can show diagrams
+      with a citation. Markdown output skips :func:`_normalize_pdf_text` (that
+      repairs pypdf's flat text; markdown is already structured).
+    * **Fallback** -- ``pypdf`` flat text + :func:`_normalize_pdf_text`, only
+      when pymupdf4llm/PyMuPDF are unavailable. No tables, no images.
     """
     ext = os.path.splitext(filename)[1].lower()
-    if ext == ".pdf":
-        try:
-            from pypdf import PdfReader  # type: ignore
-        except ImportError as exc:  # pragma: no cover - import guard
-            raise RuntimeError(
-                "pypdf is not installed. Install the rag extra: pip install '.[rag]'"
-            ) from exc
-        import io
-        reader = PdfReader(io.BytesIO(content))
-        raw = "\n\n".join(page.extract_text() or "" for page in reader.pages)
-        return _normalize_pdf_text(raw)
-    # .txt, .md, or anything else: treat as plain text.
-    return content.decode("utf-8", errors="replace")
+    if ext != ".pdf":
+        # .txt, .md, or anything else: treat as plain text.
+        return content.decode("utf-8", errors="replace"), []
+
+    md, images = _extract_pdf_markdown(content, asset_dir)
+    if md is not None:
+        return md, images
+
+    # Fallback: pypdf flat text + artifact cleanup.
+    try:
+        from pypdf import PdfReader  # type: ignore
+    except ImportError as exc:  # pragma: no cover - import guard
+        raise RuntimeError(
+            "No PDF extractor available. Install the rag extra "
+            "(pip install '.[rag]') for structure-aware extraction (pymupdf4llm) "
+            "or at least pypdf."
+        ) from exc
+    import io
+    reader = PdfReader(io.BytesIO(content))
+    raw = "\n\n".join(page.extract_text() or "" for page in reader.pages)
+    return _normalize_pdf_text(raw), []
+
+
+def _extract_pdf_markdown(
+    content: bytes, asset_dir: str | None
+) -> tuple[str | None, list[str]]:
+    """Render a PDF to markdown via pymupdf4llm; extract page images to disk.
+
+    Returns ``(markdown, image_paths)``, or ``(None, [])`` if pymupdf4llm /
+    PyMuPDF are not installed or parsing fails (caller falls back to pypdf).
+    Never hard-fails the upload path. Opens the bytes in-memory (no temp file).
+    """
+    try:
+        import fitz  # PyMuPDF, a pymupdf4llm dependency
+        import pymupdf4llm
+    except ImportError:
+        return None, []
+    try:
+        doc = fitz.open(stream=content, filetype="pdf")
+    except Exception:
+        logger.warning("PyMuPDF could not open PDF; falling back to pypdf", exc_info=True)
+        return None, []
+    try:
+        markdown = pymupdf4llm.to_markdown(doc).strip()
+        images = _extract_pdf_images(doc, asset_dir) if asset_dir else []
+        return markdown, images
+    except Exception:
+        logger.warning("pymupdf4llm extraction failed; falling back to pypdf", exc_info=True)
+        return None, []
+    finally:
+        doc.close()
+
+
+def _extract_pdf_images(doc, asset_dir: str) -> list[str]:
+    """Extract embedded images from a PyMuPDF document to ``asset_dir``.
+
+    Returns the list of written file paths (``<asset_dir>/p<page>-i<n>.png``).
+    Deliberately conservative: skips tiny images (icons/bullets < 64px) that
+    are layout decoration, not diagrams. Any per-image failure is skipped, not
+    fatal.
+    """
+    os.makedirs(asset_dir, exist_ok=True)
+    paths: list[str] = []
+    for page_index in range(doc.page_count):
+        page = doc[page_index]
+        for img_i, img in enumerate(page.get_images(full=True)):
+            xref = img[0]
+            try:
+                import fitz
+                pix = fitz.Pixmap(doc, xref)
+                if pix.width < 64 or pix.height < 64:
+                    continue  # decorative, skip
+                if pix.n >= 5:  # CMYK/alpha -> convert to RGB
+                    pix = fitz.Pixmap(fitz.csRGB, pix)
+                out = os.path.join(asset_dir, f"p{page_index + 1}-i{img_i}.png")
+                pix.save(out)
+                paths.append(out)
+            except Exception:  # noqa: BLE001, S112 - skip a bad image, keep going
+                continue
+    return paths
+
+
+# A markdown table block: one or more lines starting with "|". pymupdf4llm
+# emits tables in GitHub-flavored markdown, so a chunk that contains a table
+# has contiguous pipe-prefixed lines (header | --- | rows).
+_MD_TABLE_RE = re.compile(r"(?:^\|.*\|\s*$\n?){2,}", re.MULTILINE)
+
+
+def _extract_markdown_tables(text: str) -> list[str]:
+    """Return the markdown table blocks found in ``text`` (may be empty)."""
+    return [m.group(0).strip() for m in _MD_TABLE_RE.finditer(text)]

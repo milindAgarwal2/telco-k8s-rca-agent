@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "k8s-rca-agent"
-version = "0.9.1"
+version = "0.10.0"
 description = "Read-only Kubernetes fault detection & root-cause agent for a 5G core (GraphRAG-style reasoning over a live dependency graph)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -38,11 +38,34 @@ cluster = [
 viz = [
     "pyvis>=0.3.2",
 ]
-# Local runbook document parsing (the Runbooks dashboard tab). pypdf is pure
-# Python -- deliberately lighter than PyMuPDF/Spire.PDF. (python-multipart,
-# needed to parse the upload form, is a core dep since the UI ships in-app.)
+# Local runbook document parsing (the Runbooks dashboard tab). Structure-aware
+# by DEFAULT: pymupdf4llm renders PDFs to markdown, preserving TABLES and the
+# kubectl command blocks that the old flat-text path mangled, and extracts
+# page IMAGES -- both surfaced in results with citations. pypdf stays as a
+# pure-Python fallback when pymupdf4llm/PyMuPDF are unavailable. (python-
+# multipart, needed to parse the upload form, is a core dep since the UI
+# ships in-app.)
 rag = [
+    "pymupdf4llm>=0.0.17",
+    "pymupdf>=1.24",
     "pypdf>=4.0",
+]
+# Semantic runbook RAG (opt-in). Upgrades the runbook RETRIEVER from TF-IDF
+# keyword overlap to embeddings-based semantic search, reusing the ChatBOT
+# stack: fastembed (BAAI/bge-small-en-v1.5 via ONNX -- NO torch/transformers,
+# CPU-only, keeps the image lean) + ChromaDB (used IN-MEMORY / ephemeral --
+# deliberately NO on-disk sqlite volume, index is rebuilt from the local
+# runbook store on startup) + langchain text splitters for markdown-aware
+# chunking. Structure-aware extraction and table/image inclusion are NOT here
+# -- they are default (the [rag] extra). This opt-in only swaps the scoring:
+# gated at runtime behind an opt-in flag AND a live LLM sidecar; if either is
+# missing the retriever silently falls back to extractive TF-IDF, so this
+# never becomes a hard dependency. Installed size ~120-200 MB.
+rag-semantic = [
+    "fastembed>=0.3",
+    "chromadb>=0.5",
+    "langchain-chroma>=0.1",
+    "langchain-text-splitters>=0.3",
 ]
 # Per-incident RCA report export (the "Download RCA PPTX" button). python-pptx
 # pulls in lxml + Pillow (~38 MB installed / ~14 MB compressed); imported

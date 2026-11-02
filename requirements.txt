@@ -10,4 +10,8 @@ python-dateutil>=2.9
 # Optional extras — install as needed:
 #   LLM reasoning:   langgraph>=0.2  langchain-core>=0.3
 #   Cluster access:  kubernetes>=29.0
+#   Runbook RAG:     pypdf>=4.0  ('.[rag]', extractive TF-IDF default)
+#   Semantic RAG:    fastembed chromadb pymupdf4llm langchain-chroma langchain-text-splitters
+#                    ('.[rag-semantic]', opt-in; falls back to extractive if deps
+#                     missing or the LLM sidecar is not opted-in/reachable)
 #   Dev:             pytest>=8.0  ruff>=0.4

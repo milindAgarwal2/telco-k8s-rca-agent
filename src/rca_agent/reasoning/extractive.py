@@ -56,9 +56,21 @@ class ExtractivePipeline:
         # uploaded through the dashboard after startup takes effect on the
         # very next incident, instead of staying frozen at whatever the
         # retriever was at pipeline-construction time.
+        #
+        # Semantic RAG is EXTRACTIVE-FIRST: it is only used when the opt-in
+        # flag is set AND the [rag-semantic] deps are present AND the LLM
+        # sidecar is opted-in + reachable (probed here). Otherwise the factory
+        # transparently falls back to the extractive TF-IDF retriever.
+        sidecar_live = False
+        if self.cfg.runbook_rag_semantic:
+            from rca_agent.reasoning.llm_rerank import sidecar_available
+            sidecar_live = sidecar_available(self.cfg)
         retriever = get_runbook_retriever(
             self.cfg.runbook_rag_url,
             local_store=get_local_store(self.cfg.runbook_store_path),
+            semantic=self.cfg.runbook_rag_semantic,
+            sidecar_available=sidecar_live,
+            embed_model=self.cfg.runbook_rag_embed_model,
         )
         steps.build_next_steps(state, retriever, self.cfg.runbook_rag_top_k,
                                query_log=self.query_log)

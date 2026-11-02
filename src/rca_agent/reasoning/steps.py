@@ -472,9 +472,18 @@ def build_next_steps(state: ReasoningState, retriever: RunbookRetriever,
     if query_log is not None:
         query_log.record(query, type(retriever).__name__, [h.title for h in hits])
     if hits:
-        state.suggested_next_steps = [
-            f"{h.title}: {h.snippet} (see {h.source})" for h in hits
-        ]
+        steps_out: list[str] = []
+        for h in hits:
+            line = f"{h.title}: {h.snippet} (see {h.source})"
+            # Append structured assets WITH citations (default behavior): a
+            # tabular or diagram remedy is surfaced, not flattened away.
+            for t in getattr(h, "tables", []):
+                line += f"\n\n[table — {t.source}]\n{t.content}"
+            for img in getattr(h, "images", []):
+                cap = f" {img.caption}" if img.caption else ""
+                line += f"\n\n[figure — {img.source}]{cap} {img.path or ''}".rstrip()
+            steps_out.append(line)
+        state.suggested_next_steps = steps_out
     else:
         state.suggested_next_steps = [NO_RUNBOOK_SOURCE_NOTE]
     return state

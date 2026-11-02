@@ -37,7 +37,7 @@ from rca_agent.detection.event_watcher import EventWatcher
 from rca_agent.graph.builder import GraphBuilder
 from rca_agent.models.alert import AlertmanagerPayload
 from rca_agent.models.incident import IncidentReport
-from rca_agent.rag.local_store import extract_text, get_local_store
+from rca_agent.rag.local_store import extract_document, get_local_store
 from rca_agent.rag.query_log import get_query_log
 from rca_agent.reasoning.flow import ReasoningFlow
 
@@ -375,13 +375,18 @@ async def upload_runbook(file: UploadFile = File(...)) -> dict:  # noqa: B008
     """
     content = await file.read()
     name = file.filename or "runbook.txt"
+    import os
+    import re as _re
+    # Per-document asset dir (sanitized name) for extracted page images.
+    safe = _re.sub(r"[^A-Za-z0-9._-]", "_", os.path.splitext(name)[0]) or "runbook"
+    asset_dir = os.path.join(settings.runbook_asset_dir, safe)
     try:
-        text = extract_text(name, content)
+        text, images = extract_document(name, content, asset_dir=asset_dir)
     except RuntimeError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not text.strip():
         raise HTTPException(status_code=400, detail="no extractable text in uploaded file")
-    doc = _local_store.add_document(name, text)
+    doc = _local_store.add_document(name, text, images=images)
     return asdict(doc)
 
 

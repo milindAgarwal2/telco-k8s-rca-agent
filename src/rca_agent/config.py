@@ -115,6 +115,28 @@ class Settings(BaseSettings):
     runbook_rag_url: str | None = None  # existing doc-intelligence service
     runbook_rag_top_k: int = 3
     runbook_store_path: str = "/tmp/runbooks/store.json"
+    # Directory for images extracted from uploaded PDFs (structure-aware
+    # default). Page diagrams are written here and surfaced in results with a
+    # citation. Local disk, wiped on redeploy like the store itself.
+    runbook_asset_dir: str = "/tmp/runbooks/assets"
+
+    # --- Semantic runbook RAG (opt-in; the [rag-semantic] extra) ---
+    # When True, the runbook retriever is upgraded from TF-IDF keyword overlap
+    # to embeddings-based semantic search (fastembed bge-small ONNX + in-memory
+    # ChromaDB), with pymupdf4llm structure-aware extraction. This is GATED:
+    # semantic mode is only used when ALL of the following hold, else the agent
+    # transparently falls back to the extractive TF-IDF retriever:
+    #   1. runbook_rag_semantic is True (this opt-in flag), AND
+    #   2. the [rag-semantic] deps actually import, AND
+    #   3. the LLM sidecar is opted-in (reasoning_mode == "llm") AND reachable
+    #      on llm_base_url (a live /health probe succeeds).
+    # Rationale: semantic retrieval pays off when an LLM then synthesizes the
+    # hits into coherent next-steps; with no sidecar, the lighter extractive
+    # path is the honest default. The index is held IN MEMORY only (no on-disk
+    # Chroma sqlite volume) -- rebuilt from the local runbook store on startup.
+    runbook_rag_semantic: bool = False
+    # fastembed model name (ONNX, CPU). bge-small matches the ChatBOT project.
+    runbook_rag_embed_model: str = "BAAI/bge-small-en-v1.5"
 
     # --- Service-area impact (scoped) ---
     # Path to the curated pod->service-area mapping workbook (xlsx). When set

@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from collections import Counter
 from typing import ClassVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from rca_agent.rag.local_store import LocalRunbookStore
 
@@ -73,11 +73,74 @@ def _snippet(text: str, limit: int = _SNIPPET_MAX) -> str:
     return cut.rstrip(" .,;:") + " …"
 
 
+class RunbookAsset(BaseModel):
+    """A structured asset pulled from a runbook alongside a text hit.
+
+    Either a table (rendered as markdown in ``content``) or an image (``path``
+    points to the extracted image file on local disk). ``source`` is the
+    citation -- the document + page/chunk the asset came from -- so a human can
+    trace it back. Included in results BY DEFAULT (no opt-in): a remedy that is
+    a table or a diagram is useless as flattened prose.
+    """
+
+    kind: str  # "table" | "image"
+    source: str  # citation, e.g. "runbook.pdf#page3" or "runbook.pdf#chunk12"
+    content: str = ""  # markdown table text (for kind == "table")
+    path: str | None = None  # local image file path (for kind == "image")
+    caption: str = ""
+
+
 class RunbookHit(BaseModel):
     title: str
     snippet: str
     source: str  # runbook page / URL / doc id
     score: float = 0.0
+    # Structured assets from the same page/chunk as this hit, with their own
+    # citations. Default-empty so existing producers/serialization are
+    # unaffected; populated by the structure-aware extraction path.
+    tables: list[RunbookAsset] = Field(default_factory=list)
+    images: list[RunbookAsset] = Field(default_factory=list)
+
+
+def _images_by_doc(chunks) -> dict[str, list[RunbookAsset]]:
+    """Map ``doc_name -> list[RunbookAsset(image)]`` from stored chunks.
+
+    Images are attached to a document's first chunk at store time, so a
+    best-matching later chunk would otherwise miss them. Collecting per-doc
+    keeps a diagram citeable with whichever chunk scores highest.
+    """
+    out: dict[str, list[RunbookAsset]] = {}
+    for c in chunks:
+        for p in getattr(c, "images", []) or []:
+            out.setdefault(c.doc_name, []).append(
+                RunbookAsset(
+                    kind="image",
+                    source=f"{c.doc_name}#chunk{c.chunk_index}",
+                    path=p,
+                )
+            )
+    return out
+
+
+def _tables_by_doc(chunks) -> dict[str, list[RunbookAsset]]:
+    """Map ``doc_name -> list[RunbookAsset(table)]`` from stored chunks.
+
+    A tabular remedy may land in a sibling chunk of the one that best matches
+    the query (e.g. the heading scores highest, the steps table is the next
+    chunk). Collecting per-doc keeps the table surfaced -- each with a chunk
+    citation so a human can trace it.
+    """
+    out: dict[str, list[RunbookAsset]] = {}
+    for c in chunks:
+        for t in getattr(c, "tables", []) or []:
+            out.setdefault(c.doc_name, []).append(
+                RunbookAsset(
+                    kind="table",
+                    source=f"{c.doc_name}#chunk{c.chunk_index}",
+                    content=t,
+                )
+            )
+    return out
 
 
 class RunbookRetriever(ABC):
@@ -171,12 +234,19 @@ class LocalRunbookRetriever(RunbookRetriever):
                 best_per_doc[chunk.doc_name] = (score, chunk)
 
         ranked = sorted(best_per_doc.values(), key=lambda pair: pair[0], reverse=True)
+        # Doc-level asset indexes: tables/images may sit on a sibling chunk of
+        # the best-matching one (see LocalRunbookStore.add_document), so collect
+        # per-doc -- each asset keeps its own chunk citation.
+        images_by_doc = _images_by_doc(chunks)
+        tables_by_doc = _tables_by_doc(chunks)
         return [
             RunbookHit(
                 title=chunk.doc_name,
                 snippet=_snippet(chunk.text),
                 source=f"{chunk.doc_name}#chunk{chunk.chunk_index}",
                 score=round(score, 3),
+                tables=tables_by_doc.get(chunk.doc_name, []),
+                images=images_by_doc.get(chunk.doc_name, []),
             )
             for score, chunk in ranked[:top_k]
         ]
@@ -199,24 +269,67 @@ class NullRunbookRetriever(RunbookRetriever):
 def get_runbook_retriever(
     rag_url: str | None,
     local_store: LocalRunbookStore | None = None,
+    *,
+    semantic: bool = False,
+    sidecar_available: bool = False,
+    embed_model: str = "BAAI/bge-small-en-v1.5",
 ) -> RunbookRetriever:
     """Factory. Priority order:
 
-    1. :class:`LocalRunbookRetriever` -- if ``local_store`` is given AND has
-       at least one uploaded document. Added for the dashboard's Runbooks
-       tab; purely additive, does not touch the branches below.
-    2. HTTP-backed retriever when ``rag_url`` is configured -- TODO (Phase 2),
-       still unbuilt, unchanged from before the local_store branch existed.
-    3. :class:`NullRunbookRetriever` -- no source configured/no local docs,
-       so no misleading canned runbooks appear.
+    1. **Semantic** over uploaded docs -- ONLY when ALL hold:
+       ``semantic`` opt-in is True, the ``[rag-semantic]`` deps import, the LLM
+       ``sidecar_available`` is True, and ``local_store`` has documents. If
+       construction fails for any reason it falls through to (2). This is the
+       EXTRACTIVE-FIRST fallback: semantic is a best-effort upgrade, never a
+       hard requirement.
+    2. :class:`LocalRunbookRetriever` (extractive TF-IDF) -- if ``local_store``
+       is given AND has at least one uploaded document. The default runbook
+       path and the fallback when semantic is off/unavailable.
+    3. HTTP-backed retriever when ``rag_url`` is configured -- TODO (Phase 2),
+       still unbuilt.
+    4. :class:`NullRunbookRetriever` -- no source/no local docs, so no
+       misleading canned runbooks appear.
 
     The keyword ``StubRunbookRetriever`` still exists for demos/tests but is
-    not reachable from here: emitting its canned UPF/SMF runbooks against a
-    real cluster implied findings that did not come from the cluster.
+    not reachable from here.
     """
     if local_store is not None and local_store.has_documents():
+        if semantic and sidecar_available:
+            retriever = _try_semantic(local_store, embed_model)
+            if retriever is not None:
+                return retriever
+            # else: deps missing / build failed -> extractive-first fallback.
         return LocalRunbookRetriever(local_store)
     if not rag_url:
         return NullRunbookRetriever()
     # TODO (Phase 2): implement HttpRunbookRetriever against the doc-intelligence service.
     return NullRunbookRetriever()
+
+
+def _try_semantic(
+    local_store: LocalRunbookStore, embed_model: str
+) -> RunbookRetriever | None:
+    """Construct the semantic retriever, or return None to fall back.
+
+    Isolated so an ImportError (deps not installed) or any build-time failure
+    (model download blocked offline, Chroma init error) degrades gracefully to
+    the extractive retriever instead of breaking the incident pipeline.
+    """
+    import logging
+
+    log = logging.getLogger("rca_agent.rag")
+    try:
+        from rca_agent.rag.semantic_store import (
+            SemanticRunbookRetriever,
+            semantic_deps_available,
+        )
+    except ImportError:
+        return None
+    if not semantic_deps_available():
+        log.info("semantic RAG requested but [rag-semantic] deps missing; using extractive")
+        return None
+    try:
+        return SemanticRunbookRetriever(local_store, embed_model=embed_model)
+    except Exception:
+        log.warning("semantic RAG build failed; falling back to extractive", exc_info=True)
+        return None
