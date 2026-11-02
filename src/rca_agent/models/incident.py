@@ -7,6 +7,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from rca_agent.impact.models import ServiceAreaImpact
+
 
 class Severity(str, Enum):
     critical = "critical"
@@ -87,6 +89,14 @@ class IncidentReport(BaseModel):
     upstream_unhealthy: list[str] = Field(default_factory=list)
     evidence: list[Evidence] = Field(default_factory=list)
     suggested_next_steps: list[str] = Field(default_factory=list)
+
+    # Scoped service-area impact (0.9.0): which curated service AREA the
+    # affected pod belongs to + factual redundancy counts. None when the
+    # feature is off (no mapping configured) or the pod is unmapped. Additive
+    # and defaulted so existing reports/serialization are unaffected. This is
+    # IMPACT context (what area is affected), NOT a cause -- it never changes
+    # hypothesis ranking.
+    service_area: ServiceAreaImpact | None = None
 
     # Other incident_ids sharing this one's exact failure signature on a
     # DIFFERENT resource within the correlation window (see

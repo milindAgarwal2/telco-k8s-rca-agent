@@ -92,6 +92,37 @@
   <div class="small text-secondary">No hypotheses.</div>
 {% endfor %}
 
+{% if d.service_area %}
+  {% set sa = d.service_area %}
+  {% set conf_badge = {"High":"text-bg-success","Medium":"text-bg-warning","Low":"text-bg-secondary","Unknown":"text-bg-light"} %}
+  <div class="fw-semibold small text-uppercase text-secondary mt-3 mb-2">Service area impacted</div>
+  {% if sa.mapped %}
+    <div class="border rounded-3 p-2 mb-2">
+      <div class="small">
+        🗂️ <strong>{{ sa.service_area }}</strong>
+        <span class="text-secondary">(section {{ sa.section }})</span>
+        · <span class="badge {{ conf_badge.get(sa.confidence, 'text-bg-light') }}">confidence: {{ sa.confidence }}</span>
+      </div>
+      <div class="small text-secondary mt-1">
+        component <code>{{ sa.component }}</code>
+        {% if sa.relationship_type %}· {{ sa.relationship_type }}{% endif %}
+      </div>
+      <div class="small mt-1">
+        🧩 <strong>{{ sa.component_sibling_count }}</strong> pod(s) in this component
+        · 🗃️ <strong>{{ sa.service_area_pod_count }}</strong> pod(s) in the service area
+      </div>
+      <div class="text-secondary mt-1" style="font-size:.72rem;">
+        Source: service-area mapping workbook. Redundancy counts are factual
+        pod counts from the mapping, not an outage prediction.
+      </div>
+    </div>
+  {% else %}
+    <div class="small text-secondary fst-italic mb-2">
+      Service area UNKNOWN — this pod is not mapped in the service-area workbook.
+    </div>
+  {% endif %}
+{% endif %}
+
 <div class="fw-semibold small text-uppercase text-secondary mt-3 mb-2">Impact &amp; dependencies</div>
 <div class="row g-2">
   <div class="col-md-6">

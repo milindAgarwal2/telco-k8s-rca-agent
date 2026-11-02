@@ -1,0 +1,236 @@
+================================================================================
+IMPLEMENTATION MAP — SERVICE-AREA IMPACT (SCOPED)
+Project: telco-k8s-rca-agent   ·   target version: 0.9.0
+Source data: resilience_common_services_pod_mapping.xlsx
+Companion analysis: service-loss-analysis.txt
+Supersedes: the broader service-loss-implementation-map.txt
+Written: 2026-11-01
+================================================================================
+
+SCOPE DECISION (why this is deliberately small)
+-----------------------------------------------
+We keep ONLY what the mapping supports with high confidence and drop the
+inferred / "Low match level" parts.
+
+  KEEP (factual, straight from the workbook):
+    - Service AREA impacted when a pod is unhealthy
+        (mapped component, service group, PDF section, confidence)
+    - REDUNDANCY COUNT (factual, not inferred):
+        * component siblings (e.g. "2 PC VPN Gateway Forwarder pods")
+        * service-area total (e.g. "VPN Gateway area has 22 pods")
+
+  DROP (uncertain — do NOT output):
+    - probable alerts / numeric alert IDs       (all "Low" match level)
+    - worst-severity scoring                    (derived from the above)
+    - downstream "blast radius" services        (inferred/cross-section)
+    - FULL_LOSS vs DEGRADED verdict             (a judgement; we just report
+                                                 the counts and let the human
+                                                 decide)
+
+Data support (verified): 126 pods, 0 missing service, 104 High / 6 Medium /
+2 Low / 14 Unmapped confidence. The service-area mapping is the solid column;
+unmapped pods are reported honestly as UNKNOWN, never guessed.
+
+
+--------------------------------------------------------------------------------
+SAMPLE OUTPUT (the contract this module must produce)
+--------------------------------------------------------------------------------
+Per-pod lookup (incident panel / API):
+
+    ========== SERVICE AREA IMPACTED ==========
+    Pod:              eric-pc-vpn-gateway-forwarder-85c5f46fc5-9zspm
+    Mapped component: PC VPN Gateway Forwarder
+    Service area:     VPN Gateway   (Resilience PDF section 18)
+    Mapping:          Direct component match  ·  Confidence: High
+    Redundancy:       2 PC VPN Gateway Forwarder pod(s) in this component
+                      22 pod(s) total in the VPN Gateway service area
+    Source: resilience_common_services_pod_mapping.xlsx (Pod map + section 18)
+    ===========================================
+
+Unmapped pod:
+    Service area:  UNKNOWN — pod not mapped to a service area in the workbook.
+
+
+--------------------------------------------------------------------------------
+PHASE 0 — DATA MODEL & LOADER  (the whole core; no cluster, no UI)
+--------------------------------------------------------------------------------
+New package: src/rca_agent/impact/
+
+  impact/models.py
+    - ServiceArea(pydantic): section:int|str, service:str,
+        components:str, direct_pods:list[str]
+    - ServiceAreaImpact(pydantic):   # the per-pod answer
+        pod:str, component:str, service_area:str, section:str,
+        relationship_type:str, confidence:str,     # High/Medium/Low/Unknown
+        component_sibling_count:int,                # pods sharing this component
+        service_area_pod_count:int,                 # pods in the whole section
+        mapped:bool                                 # False -> UNKNOWN
+
+  impact/loader.py
+    - load_service_areas(path) -> ServiceAreaIndex
+      * openpyxl, data_only=True. Parse TWO sheets only:
+          "Pod map"        -> per-pod component / section / relationship / conf
+          "20-section map" -> per-section service name + \n-split direct pods
+      * Pod-name STEM match: strip the K8s replicaset/pod hash suffix so a live
+        pod name matches the mapping even if the hash rolled. (Reuse the
+        hash-suffix idea from rag/runbook_retriever._HASH_LIKE_RE.)
+      * component_sibling_count = # pods in "Pod map" with the same
+        "Mapped service/component" value.
+      * service_area_pod_count = # direct pods for that section in 20-section map.
+      * Ignore "Alert mapping detail" entirely (out of scope).
+      * Unmapped / "No clear matching pod" -> mapped=False, confidence="Unknown".
+
+  impact/index.py  (ServiceAreaIndex — thin, queryable)
+    - by_pod(pod_name) -> ServiceAreaImpact      (stem-normalized lookup)
+    - all() -> list[ServiceAreaImpact]           (for the xlsx generator)
+    - NO scoring, NO severity, NO reverse/downstream index.
+
+  TESTS: tests/test_impact_loader.py
+    - parses a small fixture copy of the workbook (tests/fixtures/)
+    - forwarder pod -> component "PC VPN Gateway Forwarder", area "VPN Gateway",
+      section 18, confidence High, component_sibling_count == 2,
+      service_area_pod_count == 22
+    - hashed live pod name still resolves (stem match)
+    - unmapped pod -> mapped=False, confidence "Unknown", no fabricated area
+
+
+--------------------------------------------------------------------------------
+PHASE 1 — STANDALONE ARTIFACT  (quick win, no agent changes)
+--------------------------------------------------------------------------------
+  scripts/gen_service_area_xlsx.py
+    - Uses impact/ to emit service-area-impact.xlsx, ONE main sheet:
+        "Pod Service Area":
+          POD | COMPONENT | SERVICE AREA | SECTION | CONFIDENCE |
+          COMPONENT PODS (#) | SERVICE AREA PODS (#)
+        (UNKNOWN rows greyed; sorted by service area then pod)
+    - Optional "Service Areas" sheet: area | section | total pods | components
+      (a plain summary of the 20-section map).
+    - Optional --live cobra-pods-*.xlsx -> add a "Current status" column so an
+      operator can see the area for any NOT-RUNNING pod (pure spreadsheet join).
+    - Verify: openpyxl re-read asserts the forwarder row values + row count.
+
+
+--------------------------------------------------------------------------------
+PHASE 2 — LIVE INTEGRATION INTO THE RCA AGENT
+--------------------------------------------------------------------------------
+  config.py  (existing RCA_ pattern)
+    - service_area_map_path: str | None = None   (RCA_SERVICE_AREA_MAP_PATH)
+      Set + file exists -> feature on; else inert (same pattern as the runbook
+      local_store). Load once at startup; cache the ServiceAreaIndex.
+
+  models/incident.py  (additive, defaulted — no existing test breaks)
+    - service_area: ServiceAreaImpact | None = None
+
+  reasoning/steps.py
+    - build_service_area(state, index) -> state
+        For state.affected_resource (and each affected_pod), look up by_pod();
+        attach the best (highest-confidence, mapped) result to
+        state.service_area; add ONE Evidence(category="impact", summary=
+        "Affected pod belongs to service area 'VPN Gateway' (section 18); "
+        "component 'PC VPN Gateway Forwarder' has 2 pod(s), area has 22",
+        citation.source = mapping workbook). Read-only, cited.
+    - Wire into ExtractivePipeline.run() AFTER graph_walk. Computed ONCE at
+      incident creation and frozen on the report (document this, same as
+      suggested_next_steps).
+    - DOES NOT touch hypothesis ranking (it's impact context, not a cause).
+
+  reasoning/extractive.py
+    - Resolve the ServiceAreaIndex from settings fresh per incident (so a
+      re-uploaded map takes effect next incident), mirroring
+      get_runbook_retriever.
+
+  TESTS: tests/test_impact_pipeline.py
+    - incident on the forwarder pod -> report.service_area.service_area ==
+      "VPN Gateway", component_sibling_count == 2, area count 22, + one
+      "impact" evidence item carrying a workbook citation
+    - feature OFF (no path) -> service_area is None, nothing added
+    - unmapped pod -> mapped=False / UNKNOWN, no fabricated area
+
+
+--------------------------------------------------------------------------------
+PHASE 3 — DASHBOARD SURFACING  (UI)
+--------------------------------------------------------------------------------
+  webhook/ui.py + templates
+    - Thread the index through ui.init(...) (keyword arg, like local_store).
+    - templates/_incident_detail.html: small "Service area impacted" panel:
+        Service area (badge) · PDF section · mapped component · confidence ·
+        "component pods: 2 · service-area pods: 22" · citation link.
+        UNKNOWN -> grey "not mapped" note (never a guess).
+    - pptx_report.py: one "Service area: <area> (section N), component has K of
+      M-area pods" line in the incident export.
+
+  TESTS: tests/test_gui_service_area.py
+    - panel renders when service_area present; absent cleanly when None/UNKNOWN.
+
+
+--------------------------------------------------------------------------------
+PHASE 4 — POLISH / RELEASE
+--------------------------------------------------------------------------------
+  - docs/arch/08-service-area.mmd (+png/svg) small detail diagram.
+  - INSTALL.md: RCA_SERVICE_AREA_MAP_PATH env + how to upload/refresh the map.
+  - KB: append "0.9.0 service-area impact" to the session KB and re-index.
+  - make check (expect ~168+ tests), ruff clean.
+  - Bump 0.9.0; commit; ./scripts/git-push.sh.
+  - ./scripts/release.sh 0.9.0 ; scp ; deploy-cobra.sh --with-llm --app-tag 0.9.0.
+    Ship the mapping file alongside (mounted/uploaded, NOT baked into image).
+
+
+--------------------------------------------------------------------------------
+DEPENDENCY ORDER
+--------------------------------------------------------------------------------
+  Phase 0 (models + loader + index + tests)
+     ├─> Phase 1 (service-area-impact.xlsx)     [independent; ship first]
+     └─> Phase 2 (pipeline)
+             └─> Phase 3 (UI + pptx)
+                     └─> Phase 4 (docs/release)
+
+  Phases 0+1 are a self-contained point release and need no live cluster.
+
+
+--------------------------------------------------------------------------------
+FILES TOUCHED
+--------------------------------------------------------------------------------
+  NEW:
+    src/rca_agent/impact/__init__.py
+    src/rca_agent/impact/models.py
+    src/rca_agent/impact/loader.py
+    src/rca_agent/impact/index.py
+    scripts/gen_service_area_xlsx.py
+    tests/test_impact_loader.py
+    tests/test_impact_pipeline.py
+    tests/test_gui_service_area.py
+    tests/fixtures/ (small mapping sample)
+    docs/arch/08-service-area.mmd (+png/svg)
+  MODIFIED:
+    src/rca_agent/config.py                 (service_area_map_path)
+    src/rca_agent/models/incident.py        (service_area field)
+    src/rca_agent/reasoning/steps.py        (build_service_area)
+    src/rca_agent/reasoning/extractive.py   (wire step + index)
+    src/rca_agent/webhook/ui.py             (thread index)
+    src/rca_agent/webhook/templates/_incident_detail.html (panel)
+    src/rca_agent/webhook/pptx_report.py    (service-area line)
+    INSTALL.md
+    .kiro/knowledge/session-2026-10-29.md
+
+  NOTE: no scoring.py, no alert-mapping join, no downstream index — removed vs
+  the earlier broader map.
+
+
+--------------------------------------------------------------------------------
+RISKS / DECISIONS / HONEST CAVEATS
+--------------------------------------------------------------------------------
+  - Area, not blame. The output says which service area is affected + how many
+    pods back it. It does NOT claim full vs partial outage or name downstream
+    victims — those were the uncertain parts and are intentionally excluded.
+  - Confidence surfaced. Show High/Medium/Low from the workbook; render
+    UNKNOWN for the 14 unmapped pods rather than guessing.
+  - Redundancy count is component-scoped AND area-scoped, shown separately, so
+    "2 forwarder pods" isn't confused with "22 VPN Gateway pods". Both are
+    factual row counts from the mapping, not inferred.
+  - Pod-name drift. Match on the stem; replica counts are a point-in-time
+    snapshot and can change — treat the workbook counts as a baseline.
+  - Freshness. Live service_area is frozen at incident creation (same as
+    suggested_next_steps); document it.
+  - Provenance. The mapping is a curated best-effort artifact; cite the
+    workbook as the source (keeps the "everything cited" invariant).
+================================================================================

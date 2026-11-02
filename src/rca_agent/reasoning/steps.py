@@ -480,6 +480,44 @@ def build_next_steps(state: ReasoningState, retriever: RunbookRetriever,
     return state
 
 
+def build_service_area(state: ReasoningState, index) -> ReasoningState:
+    """Attach the service AREA the affected pod belongs to (scoped impact).
+
+    ``index`` is a ServiceAreaIndex or None (feature off). Looks up the affected
+    resource -- falling back to the first affected pod -- and, if the pod is
+    mapped, attaches the ServiceAreaImpact to the state plus one cited evidence
+    item. IMPACT context only: it never creates or reweights a hypothesis.
+    A no-op when the feature is off or the pod is unmapped (no fabricated area).
+    """
+    if index is None:
+        return state
+    candidates = [state.affected_resource, *state.affected_pods]
+    impact = None
+    for pod in candidates:
+        if not pod:
+            continue
+        found = index.by_pod(pod)
+        if found.mapped:
+            impact = found
+            break
+    if impact is None:
+        return state
+
+    state.service_area = impact
+    state.add_evidence(Evidence(
+        category="impact",
+        summary=impact.summary_line(),
+        resource=impact.pod,
+        citations=[Citation(
+            kind="impact",
+            source="service-area mapping workbook",
+            detail=f"{impact.service_area} (section {impact.section}), "
+                   f"component '{impact.component}'",
+        )],
+    ))
+    return state
+
+
 def _utcnow():
     from datetime import datetime, timezone
     return datetime.now(timezone.utc)

@@ -1,0 +1,120 @@
+================================================================================
+POTENTIAL SERVICE LOSS ANALYSIS
+Source: resilience_common_services_pod_mapping.xlsx
+Namespace: plantx2avzwcspgc-y-oc-consp-301 (cSAEGW-C, Cobra 2a)
+Written: 2026-11-01
+================================================================================
+
+PURPOSE
+-------
+Suggestions for using the pod-to-service mapping workbook to estimate the
+potential service loss when a given pod goes down.
+
+
+WHAT THE WORKBOOK CONTAINS (verified)
+-------------------------------------
+Four sheets:
+
+  1. "20-section map" (21 rows)
+       Service groups -> direct pods + related/cross-section pods + coverage
+       notes. Columns: PDF section number, service group, components, pods
+       mapped directly (exact names), related pods / cross-section links,
+       coverage notes.
+
+  2. "Pod map" (127 rows)
+       Every pod -> service/component, PDF section(s), relationship type,
+       CONFIDENCE (High/.../Low), mapping basis/caveat, probable alerts.
+
+  3. "Notes & gaps" (15 rows)
+       Methodology + known gaps (best-effort name-and-description mapping;
+       ambiguous names not forced into a service).
+
+  4. "Alert mapping detail" (412 rows)
+       Pod -> specific alerts: numeric alert ID, alert type, specific problem,
+       area, network function, Alarm/Alert type, DEFAULT SEVERITY, additional
+       text, MATCH LEVEL, why-probable rationale.
+
+
+CORE IDEA
+---------
+A pod going down degrades its service/component, which maps to a PDF service
+section, which has a blast radius (related pods / cross-section links) and a set
+of probable alerts. Joining the sheets turns this into a loss estimate.
+
+
+SUGGESTIONS (ranked by value vs. effort)
+-----------------------------------------
+
+1. PER-POD "SERVICE LOSS" LOOKUP  (easiest, highest value)
+   For any pod name, join the three sheets to produce:
+     - the service it belongs to
+     - the PDF section
+     - how many SIBLING pods serve that same service (redundancy)
+     - the related/downstream pods
+     - the probable alerts that would fire
+   = a one-row answer to "if THIS pod dies, what breaks and what alarms."
+
+2. REDUNDANCY / SINGLE-POINT-OF-FAILURE (SPOF) SCORE  (most actionable)
+   From the 20-section map, count direct pods per service:
+     - Services with 1 direct pod  = SPOF -> losing it = FULL service loss.
+       Examples seen: Certificate Management (1), Health Check (1), and
+       single-instance components inside larger sections.
+     - Services with N pods (e.g. Key Management 10, VPN Gateway 22,
+       Document Database 15) = losing one pod = PARTIAL/DEGRADED, likely
+       tolerable.
+   Produce a column:
+       impact = FULL LOSS   if siblings == 0
+                DEGRADED (1 of N)  otherwise
+   This directly answers "potential service loss."
+
+3. BLAST-RADIUS EXPANSION VIA RELATED PODS
+   The "Related pods / cross-section links" column already encodes cascade.
+   e.g. Fault Management depends on Message Bus KF + Alarm Handler DB. So
+   losing a Message Bus KF pod doesn't just degrade Message Bus -- it risks
+   Fault Management too. Build a REVERSE index: for each pod, "services that
+   list me as a related dependency" = the downstream services at risk. This is
+   the dependency-graph blast radius, sourced from the curated mapping rather
+   than inferred.
+
+4. SEVERITY-WEIGHTED LOSS SCORE
+   Join Pod map -> Alert mapping detail and roll up the Default Severity of the
+   alerts each pod would trigger (critical/major/minor/warning). A pod whose
+   loss fires CRITICAL alarms ranks above one that fires only warnings. Gives a
+   ranked "worst pods to lose" list.
+
+5. LIVE OVERLAY (ties it to the RCA agent)
+   Cross-reference this static mapping with the live pod list
+   (cobra-pods-plantx2avzwcspgc-y-oc-consp-301.xlsx). For any pod currently
+   not-Running (e.g. the rca-demo-imagepull pod), immediately show its
+   predicted service loss + probable alerts. This bridges detection (RCA agent
+   finds the fault) with service/business impact (this mapping explains it).
+   Could become a new evidence source or a "service impact" panel in the
+   dashboard.
+
+
+RECOMMENDATION
+--------------
+Start with #2 (SPOF scoring) + #1 (per-pod lookup) -- together they answer the
+exact question ("potential service loss if a pod goes down") and are computable
+purely from the sheets already present. Then layer #3 (blast radius) and #4
+(severity weighting) for a proper ranked risk register.
+
+Proposed output workbook: service-loss-impact.xlsx
+  - "Pod Impact" sheet: pod -> service -> section -> confidence ->
+    # sibling pods -> impact (FULL/DEGRADED) -> downstream services at risk ->
+    worst probable-alert severity.
+  - "Service SPOF" sheet: service -> pod count -> SPOF flag, SPOFs sorted first.
+  - "Notes" sheet: honest caveats.
+
+
+HONEST CAVEATS (from the data itself)
+-------------------------------------
+  - Many alert matches are marked "Low" match level (e.g. "alert catalog does
+    not name a CM pod") -- treat alert linkage as probable, not certain.
+  - Several sections have NO identifiable pod (e.g. Ingress Controller CR
+    microservice, Identity and Access Management) -- impact for those is
+    unknown, not zero.
+  - The pod inventory is a point-in-time snapshot; instance counts (and thus
+    the SPOF/DEGRADED verdict) can change as replicas scale.
+  - The impact model should surface CONFIDENCE, not present results as fact.
+================================================================================

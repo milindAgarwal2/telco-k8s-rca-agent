@@ -98,3 +98,40 @@ scp models/model.gguf eagamil@10.242.70.7:~/models/model.gguf
 The 1.5B Q4 model needs ~2 GB RAM, runs on CPU, a few seconds per rerank (one
 call per incident). The agent image is unaffected (~104 MB); the model and the
 sidecar are separate.
+
+
+## 3. Optional: service-area impact mapping
+
+A scoped, read-only feature: when an incident's affected pod is found in a
+curated pod-to-service-area mapping workbook, the incident gains a
+**Service area impacted** panel (service area, PDF section, mapping confidence,
+and factual redundancy counts — how many pods share the component and how many
+pods the whole service area has). It reports ONLY what the mapping supports
+directly — no alerts, severity, downstream blast radius, or outage verdict —
+and shows UNKNOWN for pods not in the workbook (never guessed). It is IMPACT
+context, not a cause, and never changes hypothesis ranking.
+
+### 3a. Provide the mapping workbook
+Point the agent at an `.xlsx` with a `Pod map` sheet (pod → component / PDF
+section / confidence) and a `20-section map` sheet (service group → direct
+pods). Set the path; unset/missing means the feature is simply inert.
+
+```bash
+RCA_SERVICE_AREA_MAP_PATH=/path/to/resilience_common_services_pod_mapping.xlsx \
+uvicorn rca_agent.webhook.app:app --port 8080
+```
+
+On Cobra, ship the workbook alongside the package (mounted/uploaded — not baked
+into the image) and set `RCA_SERVICE_AREA_MAP_PATH` in the container env.
+
+### 3b. Standalone spreadsheet (no agent, no cluster)
+Generate a per-pod service-area report directly from the mapping:
+
+```bash
+.venv/bin/python scripts/gen_service_area_xlsx.py \
+    resilience_common_services_pod_mapping.xlsx service-area-impact.xlsx \
+    [--live cobra-pods-<ns>.xlsx]
+```
+
+The optional `--live` pod dump adds a current-status column and a "Live Risk"
+sheet listing not-running pods with their service area.

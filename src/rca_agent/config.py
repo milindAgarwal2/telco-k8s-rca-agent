@@ -116,6 +116,13 @@ class Settings(BaseSettings):
     runbook_rag_top_k: int = 3
     runbook_store_path: str = "/tmp/runbooks/store.json"
 
+    # --- Service-area impact (scoped) ---
+    # Path to the curated pod->service-area mapping workbook (xlsx). When set
+    # AND the file exists, incidents gain a `service_area` field naming the
+    # service area the affected pod belongs to + factual redundancy counts.
+    # Unset/missing -> feature inert (no service_area attached). Read-only.
+    service_area_map_path: str | None = None
+
     # --- Runbook query log ---
     # Records every runbook-retrieval attempt (not LLM calls -- this project
     # has no LLM call anywhere in the default extractive pipeline) so you can

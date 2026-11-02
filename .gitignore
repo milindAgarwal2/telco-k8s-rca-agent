@@ -38,4 +38,11 @@ incident_reports/
 # LLM model files — fetched/copied separately, NEVER committed (would bloat history)
 *.gguf
 *.bin
-models/
+/models/
+
+# Live cluster data / generated spreadsheets (never commit — operational data)
+cobra-pods-*.xlsx
+resilience_common_services_pod_mapping.xlsx
+service-area-impact.xlsx
+/[0-9]*.json
+Screenshot*.png

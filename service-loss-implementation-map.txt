@@ -1,0 +1,230 @@
+================================================================================
+IMPLEMENTATION MAP — SERVICE-LOSS / SERVICE-IMPACT FEATURE
+Project: telco-k8s-rca-agent   ·   target version: 0.9.0
+Source data: resilience_common_services_pod_mapping.xlsx
+Companion analysis: service-loss-analysis.txt
+Written: 2026-11-01
+================================================================================
+
+GOAL
+----
+Given the pod->service mapping workbook, tell the operator the POTENTIAL
+SERVICE LOSS when a pod goes down: which service degrades, whether it is a full
+loss (SPOF) or degraded (1 of N), the downstream services at risk (blast
+radius), and the worst probable-alert severity. Deliver it BOTH as:
+  (A) a standalone analyst artifact (service-loss-impact.xlsx), and
+  (B) a live "Service impact" signal inside the RCA agent incident report + UI.
+
+Stays true to the design invariants: READ-ONLY, rules-first (deterministic;
+the mapping is curated data, not an LLM guess), everything cited, confidence
+surfaced (not presented as fact).
+
+
+--------------------------------------------------------------------------------
+PHASE 0 — DATA MODEL & INGEST  (foundation; no cluster, no UI)
+--------------------------------------------------------------------------------
+New package: src/rca_agent/impact/
+
+  impact/models.py
+    - ServiceMapping(pydantic): service, section, components,
+        direct_pods: list[str], related_pods: list[str], coverage_notes
+    - PodImpact(pydantic): pod, service, section, relationship_type,
+        confidence, sibling_count, impact_level ("FULL_LOSS"|"DEGRADED"|
+        "UNKNOWN"), downstream_services: list[str],
+        worst_alert_severity, probable_alerts: list[AlertRef]
+    - AlertRef(pydantic): alert_id, specific_problem, severity, match_level
+
+  impact/loader.py
+    - load_mapping(path) -> ServiceImpactIndex
+      * Parse the 3 relevant sheets (openpyxl):
+          "20-section map"  -> ServiceMapping per row (split \n-separated pods)
+          "Pod map"         -> per-pod service/section/confidence/caveat
+          "Alert mapping detail" -> AlertRef list keyed by pod
+      * Normalize pod names to a STEM (strip the K8s replicaset/pod hash
+        suffix) so a live pod name matches the mapping even if the hash rolled.
+        Reuse the hash regex idea from rag/runbook_retriever (_HASH_LIKE_RE).
+      * Skip/record "No clear matching pod" rows as gaps (do not fabricate).
+
+  impact/index.py  (ServiceImpactIndex — the queryable core)
+    - by_pod(pod_name) -> PodImpact
+    - by_service(service) -> ServiceMapping
+    - spof_services() -> list[(service, pod_count)] where direct==1
+    - downstream_of(pod) -> services that list this pod as a RELATED dep
+      (reverse index built once at load → blast radius, suggestion #3)
+    - sibling_count(pod) = len(direct_pods of its service) - 1
+
+  impact/scoring.py  (deterministic rules — suggestions #2 and #4)
+    - impact_level(sibling_count, confidence) ->
+        FULL_LOSS if siblings == 0 (and mapped) ; DEGRADED if siblings >= 1 ;
+        UNKNOWN if pod not mapped / "No clear" gap.
+    - worst_severity(alerts) -> rank critical > major > minor > warning.
+    - SEVERITY_RANK constant; ASCII-safe labels (RHEL non-UTF-8 shell).
+
+  TESTS: tests/test_impact_loader.py, tests/test_impact_scoring.py
+    - loader parses the real workbook (small fixture copy in tests/fixtures/)
+    - stem normalization matches a hashed live pod to its mapping
+    - SPOF detection: Certificate Management / Health Check flagged FULL_LOSS
+    - DEGRADED for Key Management (10), VPN Gateway (22)
+    - UNKNOWN for a "No clear matching pod" section
+    - worst_severity ordering
+
+
+--------------------------------------------------------------------------------
+PHASE 1 — STANDALONE ARTIFACT  (deliverable A; quick win, no agent changes)
+--------------------------------------------------------------------------------
+  scripts/gen_service_loss_xlsx.py
+    - Uses impact/ to emit service-loss-impact.xlsx with sheets:
+        "Pod Impact"   : pod | service | section | confidence | sibling count |
+                         impact (FULL/DEGRADED/UNKNOWN) | downstream services |
+                         worst alert severity         (red = FULL_LOSS)
+        "Service SPOF" : service | direct pod count | SPOF flag  (SPOFs first)
+        "Notes"        : caveats copied from service-loss-analysis.txt +
+                         the mapping's own "Notes & gaps"
+    - Optional: --live cobra-pods-*.xlsx  → add a "Current status" column and a
+      "Live Risk" sheet listing any NOT-RUNNING pod with its predicted impact
+      (suggestion #5, offline — just joins two spreadsheets).
+    - Verify: openpyxl re-read asserts row counts + SPOF set; eyeball top rows.
+
+  (Phase 1 gives the operator value immediately, before any live wiring.)
+
+
+--------------------------------------------------------------------------------
+PHASE 2 — LIVE INTEGRATION INTO THE RCA AGENT  (deliverable B)
+--------------------------------------------------------------------------------
+  config.py  (follow the existing RCA_ pattern)
+    - service_impact_map_path: str | None = None   (RCA_SERVICE_IMPACT_MAP_PATH)
+      When set and the file exists → feature on; else silently inert (like the
+      runbook local_store pattern). Load once at startup; cache in the index.
+
+  models/incident.py  (extend IncidentReport — additive, defaulted)
+    - service_impact: ServiceImpact | None = None
+        { service, impact_level, sibling_count, downstream_services,
+          worst_alert_severity, confidence }
+      Defaulted None so every existing test/serialization still passes.
+
+  reasoning/steps.py  (new deterministic step; mirrors build_next_steps)
+    - build_service_impact(state, index) -> state
+        For state.affected_resource (and affected_pods), look up PodImpact,
+        attach to state; add an Evidence(category="impact", summary=
+        "Service '<svc>' FULL LOSS (single instance)" / "DEGRADED (1 of N)",
+        citations -> source = mapping workbook row). Cited, read-only.
+    - Wire into ExtractivePipeline.run() AFTER graph_walk (so blast_radius from
+      the graph and downstream_services from the mapping can be cross-checked).
+    - NOTE: like suggested_next_steps, this is computed ONCE at incident
+      creation and frozen on the report (documented limitation).
+
+  reasoning/extractive.py
+    - Construct/receive the ServiceImpactIndex (settings-driven, resolved fresh
+      per incident so a re-uploaded map takes effect next incident — same
+      rationale as get_runbook_retriever).
+
+  OPTIONAL confidence nudge (keep conservative):
+    - Do NOT let the mapping change hypothesis ranking by default (it describes
+      IMPACT, not CAUSE). Keep it a separate "Service impact" section. (If
+      later desired, a FULL_LOSS SPOF could add a small, clearly-labeled
+      severity boost — gated behind a flag.)
+
+  TESTS: tests/test_impact_pipeline.py
+    - incident on a SPOF pod → report.service_impact.impact_level == FULL_LOSS
+      + an "impact" evidence item with a workbook citation
+    - feature OFF (no path) → service_impact is None, nothing added
+    - unmapped pod → UNKNOWN, no fabricated service
+
+
+--------------------------------------------------------------------------------
+PHASE 3 — DASHBOARD SURFACING  (UI)
+--------------------------------------------------------------------------------
+  webhook/ui.py + templates
+    - ui.init(...) already takes keyword components; thread the loaded index in
+      (add `service_impact_index=...`). (init signature at ui.py:51.)
+    - templates/_incident_detail.html: add a "Service impact" panel near blast
+      radius — show impact badge (FULL LOSS = red, DEGRADED = amber, UNKNOWN =
+      grey), service name, "1 of N instances", downstream services, worst
+      probable-alert severity, and a citation link to the mapping row.
+    - OPTIONAL new tab "Service Risk": render the SPOF list + per-service pod
+      counts (static view of the index), with the live status overlaid if the
+      graph is available.
+    - pptx_report.py: add one "Service impact" line to the incident export.
+
+  TESTS: extend tests/test_runbook_rag.py-style endpoint tests / a
+         tests/test_gui_service_impact.py — panel renders when service_impact
+         present; absent cleanly when None.
+
+
+--------------------------------------------------------------------------------
+PHASE 4 — POLISH / RELEASE
+--------------------------------------------------------------------------------
+  - Docs: docs/arch/08-service-impact.mmd (+png/svg) detail diagram;
+    add a row to the 10-point assessment; update INSTALL.md with the new
+    RCA_SERVICE_IMPACT_MAP_PATH env + how to upload/refresh the map.
+  - KB: append a "0.9.0 service-impact" section to
+    .kiro/knowledge/session-2026-10-29.md and re-index.
+  - make check (expect ~170+ tests), ruff clean.
+  - Bump 0.9.0; commit; ./scripts/git-push.sh.
+  - Release agent image (./scripts/release.sh 0.9.0), scp, deploy-cobra.sh
+    --with-llm --app-tag 0.9.0. Ship the mapping file alongside (NOT baked into
+    the image — mount/upload like the runbook store).
+
+
+--------------------------------------------------------------------------------
+DEPENDENCY ORDER (what unblocks what)
+--------------------------------------------------------------------------------
+  Phase 0 (models/loader/index/scoring + tests)
+     ├─> Phase 1 (standalone xlsx)          [independent, ship first]
+     └─> Phase 2 (pipeline integration)
+             └─> Phase 3 (UI + pptx)
+                     └─> Phase 4 (docs/release)
+
+  Phases 0+1 are a self-contained point release (0.8.3 or a feature branch) and
+  can go out before touching the live agent. Phases 2-4 are the 0.9.0 feature.
+
+
+--------------------------------------------------------------------------------
+FILES TOUCHED (summary)
+--------------------------------------------------------------------------------
+  NEW:
+    src/rca_agent/impact/__init__.py
+    src/rca_agent/impact/models.py
+    src/rca_agent/impact/loader.py
+    src/rca_agent/impact/index.py
+    src/rca_agent/impact/scoring.py
+    scripts/gen_service_loss_xlsx.py
+    tests/test_impact_loader.py
+    tests/test_impact_scoring.py
+    tests/test_impact_pipeline.py
+    tests/test_gui_service_impact.py
+    tests/fixtures/ (small mapping sample)
+    docs/arch/08-service-impact.mmd (+png/svg)
+  MODIFIED:
+    src/rca_agent/config.py                 (service_impact_map_path)
+    src/rca_agent/models/incident.py        (service_impact field)
+    src/rca_agent/reasoning/steps.py        (build_service_impact)
+    src/rca_agent/reasoning/extractive.py   (wire the step + index)
+    src/rca_agent/webhook/ui.py             (thread index)
+    src/rca_agent/webhook/templates/_incident_detail.html (panel)
+    src/rca_agent/webhook/pptx_report.py    (impact line)
+    INSTALL.md
+    .kiro/knowledge/session-2026-10-29.md
+
+
+--------------------------------------------------------------------------------
+RISKS / DECISIONS / HONEST CAVEATS
+--------------------------------------------------------------------------------
+  - Impact != cause. The mapping describes what is LOST, not what FAILED. Keep
+    service-impact a separate report section; do not silently reweight causes.
+  - Confidence must be surfaced. Many alert links are "Low" match level; some
+    sections have "No clear matching pod". Render confidence; show UNKNOWN
+    rather than guessing.
+  - Pod-name drift. Live pod names carry hashes; match on the stem. A service
+    scaled to new replica counts changes SPOF/DEGRADED verdicts — recompute
+    from the live snapshot, treat the workbook counts as a baseline.
+  - Static vs live. The workbook is a point-in-time inventory. Phase 1 is
+    purely static; the live risk picture comes from overlaying the current pod
+    list / graph (Phase 2/3).
+  - Freshness. Like suggested_next_steps, live service_impact is frozen at
+    incident creation — document this so operators don't expect it to update
+    on a resolved/old incident.
+  - Data provenance. The mapping is a curated/best-effort artifact (per its own
+    "Notes & gaps"); cite the workbook as the source so claims are traceable,
+    consistent with the "everything cited" invariant.
+================================================================================

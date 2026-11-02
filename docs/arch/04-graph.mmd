@@ -1,0 +1,33 @@
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','primaryColor':'#eef4ff','primaryBorderColor':'#3b6fd4','lineColor':'#5b6b86','clusterBkg':'#fafcff','clusterBorder':'#c7d4ea'}}}%%
+flowchart TB
+
+    title["DETAIL &mdash; Live Dependency Graph (NetworkX)"]:::ttl
+
+    API["K8s API (read-only)<br/>pods, services, workloads,<br/>nodes, configmaps, secrets, PVCs"]:::src
+
+    subgraph GB["GraphBuilder &mdash; rebuild every 60s"]
+        direction TB
+        B1["list resources"]:::comp
+        B2["add nodes + edges"]:::comp
+        B3["roll up health<br/>(pod &rarr; service &rarr; workload)"]:::comp
+        B1 --> B2 --> B3
+    end
+
+    subgraph DG["DependencyGraph (MultiDiGraph)"]
+        direction TB
+        N["Nodes: pod &bull; service &bull; node<br/>configmap &bull; secret &bull; PVC"]:::comp
+        E2["Edges: owns &bull; selects<br/>calls &bull; mounts"]:::comp
+        Q["Queries: upstream / downstream<br/>unhealthy_upstream &bull; neighborhood<br/>blast radius &bull; changes_between()"]:::comp
+    end
+
+    USE["Used by: graph_walk (reasoning)<br/>+ interactive dashboard graph"]:::out
+
+    API --> GB
+    GB --> DG
+    N --- E2 --- Q
+    DG --> USE
+
+    classDef ttl fill:#1f3a6b,stroke:#1f3a6b,color:#fff,font-weight:bold;
+    classDef src fill:#fff4e6,stroke:#d98a1f,color:#333;
+    classDef comp fill:#eef4ff,stroke:#3b6fd4,color:#1f3a6b;
+    classDef out fill:#eafaf0,stroke:#2e9e5b,color:#1d6b3d,font-weight:bold;

@@ -1,0 +1,32 @@
+%%{init: {'theme':'base','themeVariables':{'fontSize':'16px','primaryColor':'#eef4ff','primaryBorderColor':'#3b6fd4','lineColor':'#5b6b86','clusterBkg':'#fafcff','clusterBorder':'#c7d4ea'}}}%%
+flowchart LR
+
+    K8S["OpenShift / K8s API<br/><i>read-only</i>"]:::src
+    ALERT["Alertmanager webhook<br/><i>inbound POST</i>"]:::src
+
+    subgraph AGENT["RCA Agent (single read-only process)"]
+        direction LR
+        DET["Detection"]:::comp
+        GRAPH["Dependency Graph<br/>(NetworkX)"]:::comp
+        TOOLS["Read-only<br/>Query Tools"]:::comp
+        REASON["Reasoning<br/>Pipeline"]:::comp
+        RAG["Runbook RAG<br/>(local)"]:::comp
+        LLM["LLM Rerank<br/>(optional, local)"]:::comp
+        OUT["Incident Report<br/>+ Dashboard"]:::comp
+    end
+
+    K8S --> DET
+    ALERT --> DET
+    K8S --> GRAPH
+    K8S --> TOOLS
+
+    DET --> REASON
+    REASON --> GRAPH
+    REASON --> TOOLS
+    REASON --> RAG
+    REASON --> OUT
+    OUT --> LLM
+    LLM --> OUT
+
+    classDef src fill:#fff4e6,stroke:#d98a1f,color:#333,font-weight:bold;
+    classDef comp fill:#eef4ff,stroke:#3b6fd4,color:#1f3a6b,font-weight:bold;

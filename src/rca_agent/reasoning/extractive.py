@@ -9,6 +9,7 @@ from __future__ import annotations
 from rca_agent.config import Settings, get_settings
 from rca_agent.graph.builder import GraphBuilder
 from rca_agent.graph.dependency_graph import DependencyGraph
+from rca_agent.impact.index import load_service_area_index
 from rca_agent.models.alert import Alert
 from rca_agent.models.incident import IncidentReport, Severity
 from rca_agent.rag.local_store import get_local_store
@@ -61,6 +62,11 @@ class ExtractivePipeline:
         )
         steps.build_next_steps(state, retriever, self.cfg.runbook_rag_top_k,
                                query_log=self.query_log)
+        # Scoped service-area impact. Resolved fresh per incident (like the
+        # runbook retriever) so a re-uploaded mapping takes effect next
+        # incident. None when RCA_SERVICE_AREA_MAP_PATH is unset/missing.
+        steps.build_service_area(
+            state, load_service_area_index(self.cfg.service_area_map_path))
 
         return self._to_report(state)
 
@@ -81,6 +87,7 @@ class ExtractivePipeline:
             upstream_unhealthy=state.unhealthy_upstream,
             evidence=state.evidence,
             suggested_next_steps=state.suggested_next_steps,
+            service_area=state.service_area,
             reasoning_mode="extractive",
         )
         return report.ranked()

@@ -1,0 +1,91 @@
+%%{init: {'theme':'base','themeVariables':{'fontSize':'14px','primaryColor':'#eef4ff','primaryBorderColor':'#3b6fd4','lineColor':'#5b6b86','clusterBkg':'#fafcff','clusterBorder':'#c7d4ea'}}}%%
+flowchart LR
+
+    %% ===================== INPUTS =====================
+    subgraph SRC["Fault sources"]
+        direction TB
+        AM["Alertmanager<br/>(Prometheus alert)"]
+        K8S["OpenShift / Kubernetes API<br/>(Cobra 2a &mdash; cSAEGW-C namespace)<br/><i>read-only: get / list / watch</i>"]
+    end
+
+    %% ===================== AGENT =====================
+    subgraph AGENT["RCA Agent &mdash; single read-only process (FastAPI / uvicorn)"]
+        direction TB
+
+        subgraph DETECT["1&nbsp;&middot;&nbsp;Detection"]
+            direction TB
+            WH["Alertmanager webhook<br/>/webhook/alertmanager"]
+            EW["Event watcher<br/>(poll every 15s)<br/>new fault + status detect, dedup, merge"]
+        end
+
+        subgraph GRAPHL["Live dependency graph (NetworkX)"]
+            direction TB
+            GB["GraphBuilder<br/>rebuild every 60s"]
+            DG["DependencyGraph<br/>pods &bull; services &bull; nodes<br/>configmaps &bull; secrets &bull; PVCs<br/>edges: owns / selects / calls / mounts<br/>health roll-up + timestamped changes"]
+            GB --> DG
+        end
+
+        subgraph TOOLS["2&nbsp;&middot;&nbsp;Read-only query tools"]
+            direction TB
+            QT["pod_status &bull; recent_events<br/>logs &bull; metrics &bull; recent_changes<br/><i>no write tool exists</i>"]
+        end
+
+        subgraph REASON["3&nbsp;&middot;&nbsp;Reasoning pipeline (rules-first)"]
+            direction TB
+            P1["triage"] --> P2["gather_evidence<br/>(untrusted text fenced)"]
+            P2 --> P3["graph_walk<br/>blast radius + upstream"]
+            P3 --> P4["change_correlation<br/>link recent change &rarr; fault"]
+            P4 --> P5["hypothesize_and_rank<br/>candidate causes + confidence"]
+            P5 --> P6["build_next_steps<br/>enriched runbook query (0.8.2)"]
+        end
+
+        subgraph RAG["Runbook RAG (local, offline)"]
+            direction TB
+            RS["LocalRunbookStore<br/>uploaded docs &rarr; chunks"]
+            RR["LocalRunbookRetriever<br/>rarity-weighted keyword / TF-IDF"]
+            RS --> RR
+        end
+
+        subgraph LLM["4&nbsp;&middot;&nbsp;LLM rerank (optional, local)"]
+            direction TB
+            LR["llm_rerank client<br/>reorder + explain only"]
+            SIDE["llama.cpp sidecar<br/>Qwen2.5-1.5B Q4_K_M<br/>127.0.0.1:8090 &mdash; air-gapped"]
+            LR --> SIDE
+        end
+
+        subgraph OUT["Output"]
+            direction TB
+            REP["IncidentReport<br/>symptom &bull; ranked hypotheses<br/>evidence chain &bull; blast radius<br/>next steps &bull; citations"]
+            UI["Dashboard (HTMX + Bootstrap)<br/>incidents &bull; interactive graph<br/>runbooks &bull; query log"]
+            PPTX["PPTX export"]
+            REP --> UI
+            REP --> PPTX
+        end
+    end
+
+    %% ===================== FLOWS =====================
+    AM --> WH
+    K8S --> EW
+    K8S --> GB
+    K8S --> QT
+
+    WH --> P1
+    EW --> P1
+
+    P3 -. reads .-> DG
+    P2 -. uses .-> QT
+    P4 -. uses .-> QT
+    P6 -. queries .-> RR
+
+    P6 --> REP
+    REP -. "if LLM mode" .-> LR
+    LR --> REP
+
+    %% ===================== SAFETY NOTE =====================
+    SAFE["🔒 Read-only by construction:<br/>RBAC ClusterRole = get/list/watch only &bull; no write tool &bull; LLM fully local, no egress"]
+    AGENT -.-> SAFE
+
+    classDef src fill:#fff4e6,stroke:#d98a1f,color:#333;
+    classDef safe fill:#eafaf0,stroke:#2e9e5b,color:#1d6b3d,font-weight:bold;
+    class AM,K8S src;
+    class SAFE safe;

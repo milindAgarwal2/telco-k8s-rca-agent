@@ -1,0 +1,30 @@
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','primaryColor':'#eef4ff','primaryBorderColor':'#3b6fd4','lineColor':'#5b6b86','clusterBkg':'#fafcff','clusterBorder':'#c7d4ea'}}}%%
+flowchart LR
+
+    subgraph IN["Inputs"]
+        direction TB
+        ALERT["Alertmanager webhook<br/><i>inbound POST</i>"]:::src
+        K8S["OpenShift / K8s API<br/><i>read-only: get/list/watch</i>"]:::src
+    end
+
+    D["1&nbsp;&middot;&nbsp;DETECT<br/>webhook + event watcher (15s)"]:::comp
+    E["2&nbsp;&middot;&nbsp;GATHER EVIDENCE<br/>pod status, events, logs<br/>(untrusted text fenced)"]:::comp
+    R["3&nbsp;&middot;&nbsp;REASON<br/>graph walk + change correlation<br/>+ rank hypotheses"]:::comp
+    O["4&nbsp;&middot;&nbsp;REPORT<br/>ranked cause + evidence chain<br/>+ blast radius + next steps + citations"]:::comp
+
+    G["Live Dependency Graph<br/>(NetworkX, rebuilt 60s)"]:::side
+    RB["Runbook RAG<br/>(local, offline)"]:::side
+    L["LLM rerank<br/>(optional, local sidecar)"]:::side
+
+    ALERT --> D
+    K8S --> D
+    D --> E --> R --> O
+
+    R -. reads .-> G
+    O -. next steps .-> RB
+    O -. "if LLM mode" .-> L
+    L -. reorder + explain .-> O
+
+    classDef src fill:#fff4e6,stroke:#d98a1f,color:#333,font-weight:bold;
+    classDef comp fill:#eef4ff,stroke:#3b6fd4,color:#1f3a6b,font-weight:bold;
+    classDef side fill:#f3eefd,stroke:#8257c4,color:#43296e;

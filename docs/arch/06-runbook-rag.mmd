@@ -1,0 +1,37 @@
+%%{init: {'theme':'base','themeVariables':{'fontSize':'15px','primaryColor':'#eef4ff','primaryBorderColor':'#3b6fd4','lineColor':'#5b6b86','clusterBkg':'#fafcff','clusterBorder':'#c7d4ea'}}}%%
+flowchart TB
+
+    title["DETAIL &mdash; Runbook RAG (local, offline &mdash; no network, no embeddings)"]:::ttl
+
+    UP["Dashboard Runbooks tab<br/>upload PDF / MD / TXT"]:::src
+
+    subgraph STORE["LocalRunbookStore"]
+        direction TB
+        EX["extract_text<br/>(PDF layout cleanup)"]:::comp
+        CH["chunk_text<br/>paragraph / section chunks"]:::comp
+        PS["persist to JSON store"]:::comp
+        EX --> CH --> PS
+    end
+
+    subgraph RET["LocalRunbookRetriever"]
+        direction TB
+        QN["normalize query tokens<br/>(strip stopwords + K8s hashes)"]:::comp
+        SC["rarity-weighted keyword / TF-IDF<br/>best chunk per document"]:::comp
+        QN --> SC
+    end
+
+    Q["Query from build_next_steps<br/>cause + ImagePullBackOff / OOMKilled / ..."]:::src
+    HIT["RunbookHit(s)<br/>title + snippet + source + score"]:::out
+    NULL["No docs &rarr; NullRetriever<br/><i>honest 'no runbook source' note</i>"]:::note
+
+    UP --> STORE
+    PS --> RET
+    Q --> QN
+    SC --> HIT
+    RET -. empty store .-> NULL
+
+    classDef ttl fill:#1f3a6b,stroke:#1f3a6b,color:#fff,font-weight:bold;
+    classDef src fill:#fff4e6,stroke:#d98a1f,color:#333;
+    classDef comp fill:#eef4ff,stroke:#3b6fd4,color:#1f3a6b;
+    classDef out fill:#eafaf0,stroke:#2e9e5b,color:#1d6b3d,font-weight:bold;
+    classDef note fill:#fdf2f2,stroke:#c0392b,color:#7b241c;

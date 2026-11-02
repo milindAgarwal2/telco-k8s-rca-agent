@@ -166,6 +166,15 @@ def build_incident_pptx(report, owners: dict | None = None) -> bytes:
         add_field(s3, 0.6, y, 12.0, 0.6, "Hypotheses", "none")
         y += 0.9
 
+    sa = getattr(report, "service_area", None)
+    if sa is not None and getattr(sa, "mapped", False):
+        sa_text = (f"{sa.service_area} (section {sa.section}) — component "
+                   f"'{sa.component}': {sa.component_sibling_count} pod(s), "
+                   f"service area: {sa.service_area_pod_count} pod(s) "
+                   f"[confidence: {sa.confidence}]")
+        add_field(s3, 0.6, min(y, 6.3), 12.0, 0.6, "Service area impacted", sa_text)
+        y += 0.9
+
     if report.suggested_next_steps:
         sb = s3.shapes.add_textbox(Inches(0.6), Inches(min(y, 6.3)), Inches(12.0), Inches(0.9))
         sf = sb.text_frame; sf.word_wrap = True
