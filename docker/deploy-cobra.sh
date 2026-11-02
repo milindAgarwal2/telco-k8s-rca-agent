@@ -24,6 +24,15 @@
 #   If --sidecar-tag is omitted with --with-llm, the NEWEST
 #   rca-agent-sidecar-*.tar.gz present is auto-detected.
 #
+# Optional service-area impact mapping:
+#   If ~/resilience_common_services_pod_mapping.xlsx exists on the jumpserver
+#   (override with SERVICE_AREA_MAP_HOST=/path/to.xlsx), it is mounted read-only
+#   and RCA_SERVICE_AREA_MAP_PATH is set, enabling the "Service area impacted"
+#   panel on incidents. If absent, the feature stays inert and the agent runs
+#   normally. Example:
+#     SERVICE_AREA_MAP_HOST=~/resilience_common_services_pod_mapping.xlsx \
+#       ./deploy-cobra.sh --with-llm --app-tag 0.9.0
+#
 # LLM sidecar prerequisites (only for --with-llm):
 #   - the sidecar image tarball  (rca-agent-sidecar-<tag>.tar.gz) in this dir, AND
 #   - the GGUF model file at $LLM_GGUF_HOST (default ~/models/model.gguf).
@@ -51,6 +60,12 @@ RCA_NF_SELECTOR="${RCA_NF_SELECTOR:-}"
 RCA_REASONING_MODE="${RCA_REASONING_MODE:-extractive}"
 RUN_UID_GID="${RUN_UID_GID:-1744:1744}"
 KUBECONFIG_HOST="${KUBECONFIG_HOST:-$HOME/.kube/config}"
+
+# Optional service-area impact mapping workbook (read-only). When this file
+# exists on the host it is mounted into the agent and RCA_SERVICE_AREA_MAP_PATH
+# is set, enabling the "Service area impacted" panel. If absent, the feature
+# stays inert and the agent runs normally.
+SERVICE_AREA_MAP_HOST="${SERVICE_AREA_MAP_HOST:-$HOME/resilience_common_services_pod_mapping.xlsx}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -156,6 +171,19 @@ fi
 log "removing any existing container '$CONTAINER_NAME' ..."
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 
+# Optional service-area mapping: mount read-only + point the agent at it, but
+# only if the workbook is present on the host (feature stays inert otherwise).
+SERVICE_AREA_ARGS=()
+if [ -f "$SERVICE_AREA_MAP_HOST" ]; then
+  log "service-area map found ($SERVICE_AREA_MAP_HOST) -> enabling Service area impacted."
+  SERVICE_AREA_ARGS=(
+    -e RCA_SERVICE_AREA_MAP_PATH=/data/service-area-map.xlsx
+    -v "$SERVICE_AREA_MAP_HOST":/data/service-area-map.xlsx:ro
+  )
+else
+  log "no service-area map at $SERVICE_AREA_MAP_HOST (feature inert; agent runs normally)."
+fi
+
 log "starting $CONTAINER_NAME (ns=$RCA_NAMESPACE port=$RCA_PORT mode=$RCA_REASONING_MODE) ..."
 docker run -d \
   --name "$CONTAINER_NAME" \
@@ -171,6 +199,7 @@ docker run -d \
   -e RCA_PORT="$RCA_PORT" \
   -e KUBECONFIG=/kube/config \
   -e HOME=/tmp \
+  "${SERVICE_AREA_ARGS[@]}" \
   -v "$KUBECONFIG_HOST":/kube/config:ro \
   "$IMAGE_REF"
 
