@@ -451,7 +451,8 @@ def _enrich_runbook_query(base: str, state) -> str:
 
 
 def build_next_steps(state: ReasoningState, retriever: RunbookRetriever,
-                     top_k: int, query_log: QueryLog | None = None) -> ReasoningState:
+                     top_k: int, query_log: QueryLog | None = None,
+                     synthesize_cfg=None) -> ReasoningState:
     """Pull human-facing next steps from runbooks via RAG (recommendations only).
 
     When the retriever finds nothing (most commonly ``NullRunbookRetriever``,
@@ -464,6 +465,14 @@ def build_next_steps(state: ReasoningState, retriever: RunbookRetriever,
     Every attempt is recorded to ``query_log`` when one is given (the
     dashboard's Query Log tab) — including zero-hit attempts, since those are
     exactly the "nothing matched this" signal worth tracking.
+
+    When ``synthesize_cfg`` (a Settings) is passed -- only done when semantic
+    RAG is active AND the LLM sidecar is live -- the top hits are handed to the
+    sidecar to pick the genuine REMEDY chunk and write one grounded next-step.
+    This corrects pure-similarity ranking that would otherwise surface a config
+    EXAMPLE over the actual troubleshooting section. The synthesized step is
+    emitted FIRST with the chosen chunk's real citation; the raw hits still
+    follow as supporting context. On any failure it is a no-op (raw hits only).
     """
     top = state.hypotheses[0] if state.hypotheses else None
     base = top.cause if top else f"{state.alert.name} {state.affected_resource or ''}"
@@ -471,21 +480,35 @@ def build_next_steps(state: ReasoningState, retriever: RunbookRetriever,
     hits = retriever.retrieve(query, top_k=top_k)
     if query_log is not None:
         query_log.record(query, type(retriever).__name__, [h.title for h in hits])
-    if hits:
-        steps_out: list[str] = []
-        for h in hits:
-            line = f"{h.title}: {h.snippet} (see {h.source})"
-            # Append structured assets WITH citations (default behavior): a
-            # tabular or diagram remedy is surfaced, not flattened away.
-            for t in getattr(h, "tables", []):
-                line += f"\n\n[table — {t.source}]\n{t.content}"
-            for img in getattr(h, "images", []):
-                cap = f" {img.caption}" if img.caption else ""
-                line += f"\n\n[figure — {img.source}]{cap} {img.path or ''}".rstrip()
-            steps_out.append(line)
-        state.suggested_next_steps = steps_out
-    else:
+    if not hits:
         state.suggested_next_steps = [NO_RUNBOOK_SOURCE_NOTE]
+        return state
+
+    steps_out: list[str] = []
+
+    # Optional grounded synthesis (semantic + live sidecar only).
+    if synthesize_cfg is not None:
+        try:
+            from rca_agent.reasoning.runbook_synth import synthesize_next_step
+            symptom = f"{state.alert.name} on {state.affected_resource or ''}: {query}"
+            result = synthesize_next_step(symptom, hits, synthesize_cfg)
+        except Exception:  # noqa: BLE001 - synthesis must never break the pipeline
+            result = None
+        if result is not None:
+            next_step, chosen = result
+            steps_out.append(f"Suggested action: {next_step} (grounded in {chosen.source})")
+
+    for h in hits:
+        line = f"{h.title}: {h.snippet} (see {h.source})"
+        # Append structured assets WITH citations (default behavior): a
+        # tabular or diagram remedy is surfaced, not flattened away.
+        for t in getattr(h, "tables", []):
+            line += f"\n\n[table — {t.source}]\n{t.content}"
+        for img in getattr(h, "images", []):
+            cap = f" {img.caption}" if img.caption else ""
+            line += f"\n\n[figure — {img.source}]{cap} {img.path or ''}".rstrip()
+        steps_out.append(line)
+    state.suggested_next_steps = steps_out
     return state
 
 

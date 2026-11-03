@@ -73,7 +73,9 @@ class ExtractivePipeline:
             embed_model=self.cfg.runbook_rag_embed_model,
         )
         steps.build_next_steps(state, retriever, self.cfg.runbook_rag_top_k,
-                               query_log=self.query_log)
+                               query_log=self.query_log,
+                               synthesize_cfg=(self.cfg if (self.cfg.runbook_rag_semantic
+                                                            and sidecar_live) else None))
         # Scoped service-area impact. Resolved fresh per incident (like the
         # runbook retriever) so a re-uploaded mapping takes effect next
         # incident. None when RCA_SERVICE_AREA_MAP_PATH is unset/missing.

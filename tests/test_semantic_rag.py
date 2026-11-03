@@ -118,11 +118,20 @@ def test_build_next_steps_renders_table_and_figure_citations(tmp_path):
     store = _store(tmp_path)
     store.add_document("vol.md", RUNBOOK_MD, images=["/tmp/assets/vol/p1-i0.png"])
     retriever = LocalRunbookRetriever(store)
+    # build_next_steps derives its query from the top hypothesis cause (the
+    # realistic path), so give it a cause overlapping the runbook's wording.
+    # The point of this test is the asset rendering, not token-coincidence.
+    from rca_agent.models.incident import Hypothesis
+
     state = ReasoningState(
-        alert=Alert(name="VolumeHigh", target="eric-pm-server-0"),
+        alert=Alert(name="VolumeOccupancyHigh", target="eric-pm-server-0"),
         namespace="ns",
         affected_resource="eric-pm-server-0",
     )
+    state.hypotheses = [
+        Hypothesis(cause="volume occupancy high: delete old files from the data volume",
+                   confidence=0.8)
+    ]
     build_next_steps(state, retriever, top_k=3)
     joined = "\n".join(state.suggested_next_steps)
     assert "[table — vol.md#chunk" in joined

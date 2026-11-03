@@ -65,21 +65,50 @@ _SECTION_HEADING_RE = re.compile(
 # A numbered-section heading like "4.5 Pod Is in CrashLoopBackOff Status" or
 # "4.5.1 eric-pm-server-0 Pod Is in CrashLoopBackoff Status ...".
 _NUMBERED_HEADING_RE = re.compile(r"^\d+(?:\.\d+){0,3}\s+[A-Z]")
+# A markdown ATX heading from pymupdf4llm's structure-aware output: "# Title",
+# "## Section", "###### Subhead". The dominant section boundary in markdown
+# (prose heading regexes above rarely fire on it), so without this the chunker
+# dumped whole pages into one blob and stranded tiny fragments.
+_MD_HEADING_RE = re.compile(r"^#{1,6}\s+\S")
+# A chunk that, after stripping markdown punctuation, has too little al
+# alphabetic content to be a useful standalone hit (e.g. a stray image tag
+# "ed/monitoring/pm/eric-pm-server:14.2.0-25", a lone code fence, a table rule).
+_NOISE_CHUNK_RE = re.compile(r"[A-Za-z]{3,}")
+
+
+def _is_noise_chunk(text: str) -> bool:
+    """True if a chunk is too short / word-poor to be a useful retrieval unit.
+
+    A chunk containing a markdown TABLE is never noise -- tables are first-class
+    content (a tabular remedy), surfaced in results with a citation.
+    """
+    if "|" in text and "\n" in text and _MD_TABLE_RE.search(text):
+        return False
+    stripped = text.strip().strip("#*`|-_ \n")
+    if len(stripped) < _MIN_CHUNK_CHARS:
+        return True
+    # Fewer than 3 real words (3+ alpha chars) -> almost certainly a leftover
+    # image tag / version string / table rule, not instruction text.
+    return len(_NOISE_CHUNK_RE.findall(stripped)) < 3
 
 
 def chunk_text(text: str) -> list[str]:
     """Split ``text`` into coherent, readable chunks.
 
     Primary split is on the document's own structure -- a new chunk starts at a
-    section heading (``Solution:``, ``Cause:``, ``Diagnostics``, ``Verification``)
-    or a numbered section heading (``4.5 Pod Is in ...``). Within that, blank
-    lines still separate paragraphs. This keeps a remedy ("Solution: ... 1. ...
-    2. ...") together as one chunk instead of mixing it with the next section,
-    and stops a heading from being stranded on its own.
+    section heading: a markdown ATX heading (``#``/``##``/... from the
+    structure-aware pymupdf4llm output), a prose heading (``Solution:``,
+    ``Cause:``, ``Diagnostics``, ``Verification``), or a numbered section
+    heading (``4.5 Pod Is in ...``). Within that, blank lines still separate
+    paragraphs. This keeps a remedy ("## Solution ... 1. ... 2. ...") together
+    as one chunk instead of mixing it with the next section, and stops a
+    heading from being stranded on its own.
 
     A too-short fragment is merged into the next one (a lone heading is useless
     alone); a too-long one is hard-wrapped at a word boundary so no single chunk
-    dominates scoring just by being huge.
+    dominates scoring just by being huge. Pure-noise fragments (stray image
+    tags, version strings, table rules) are dropped entirely so they can't be
+    returned as a "hit".
     """
     paragraphs = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
     chunks: list[str] = []
@@ -88,13 +117,17 @@ def chunk_text(text: str) -> list[str]:
     def flush() -> None:
         nonlocal pending
         if pending.strip():
-            chunks.extend(_hard_wrap(pending.strip()))
+            for c in _hard_wrap(pending.strip()):
+                if not _is_noise_chunk(c):
+                    chunks.append(c)
         pending = ""
 
     for p in paragraphs:
         first_line = p.splitlines()[0].strip() if p else ""
         starts_section = bool(
-            _SECTION_HEADING_RE.match(first_line) or _NUMBERED_HEADING_RE.match(first_line)
+            _MD_HEADING_RE.match(first_line)
+            or _SECTION_HEADING_RE.match(first_line)
+            or _NUMBERED_HEADING_RE.match(first_line)
         )
         # Start a fresh chunk at a section boundary -- but only if what we've
         # accumulated is already a usable chunk; otherwise keep appending so a
@@ -397,6 +430,7 @@ def _extract_pdf_markdown(
         return None, []
     try:
         markdown = pymupdf4llm.to_markdown(doc).strip()
+        markdown = _strip_markdown_boilerplate(markdown)
         images = _extract_pdf_images(doc, asset_dir) if asset_dir else []
         return markdown, images
     except Exception:
@@ -404,6 +438,45 @@ def _extract_pdf_markdown(
         return None, []
     finally:
         doc.close()
+
+
+# Repeating page boilerplate in pymupdf4llm's markdown output: the running
+# footer "113/154 51-AXB 250 19 Uen C | 2025-01-24" (page/total + doc id +
+# optional date), the running title, bare page numbers, and markdown image
+# placeholders pymupdf4llm emits for figures it can't inline. These repeat on
+# every page and pollute both chunk snippets and the embedding -- the reason a
+# readiness-probe query matched a page whose only tie was a leaked footer.
+_MD_FOOTER_RE = re.compile(r"\d+\s*/\s*\d+\s+[\dA-Za-z \-]*Uen\b.*$")
+_MD_TITLE_RE = re.compile(
+    r"^#*\s*Troubleshoot Common Issues in Kubernetes Clusters\b.*$", re.IGNORECASE
+)
+_MD_PAGENUM_RE = re.compile(r"^\**\d{1,3}\**\s*$")
+_MD_IMG_PLACEHOLDER_RE = re.compile(r"^!\[.*?\]\(.*?\)\s*$")
+
+
+def _strip_markdown_boilerplate(md: str) -> str:
+    """Remove repeating page footers/titles/placeholders from markdown.
+
+    Conservative: only drops lines matching recognizable boilerplate patterns,
+    leaving real instruction text intact. Runs on pymupdf4llm output (the flat
+    pypdf path keeps its own :func:`_normalize_pdf_text` cleanup).
+    """
+    out: list[str] = []
+    for ln in md.splitlines():
+        s = ln.strip()
+        if not s:
+            out.append("")
+            continue
+        if (
+            _MD_FOOTER_RE.search(s)
+            or _MD_TITLE_RE.match(s)
+            or _MD_PAGENUM_RE.match(s)
+            or _MD_IMG_PLACEHOLDER_RE.match(s)
+        ):
+            continue
+        out.append(ln)
+    text = "\n".join(out)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def _extract_pdf_images(doc, asset_dir: str) -> list[str]:
