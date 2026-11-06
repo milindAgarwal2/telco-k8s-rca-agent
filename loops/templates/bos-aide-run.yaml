@@ -1,0 +1,48 @@
+# BOS AIDE agent-readable run input; not native Kiro config or an executable DSL.
+# Copy to loops/runs/STORY-123.yaml and configure it once per story.
+# All paths are workspace-relative. No credentials or approval receipts here.
+schema_version: "bos-aide-loop-run/v0.2"
+run_id: "STORY-123-attempt-01"
+story_id: "STORY-123"
+story_file: "jira/STORY-123.md" # Replace with an existing local story export.
+spec_dir: ".kiro/specs/story-123" # Reviewed requirements.md/design.md/tasks.md.
+change_scope: [] # REQUIRED: reviewed exact files or patterns, e.g. src/**.
+operation_target: "repository:." # Local repository; external targets are separate.
+max_repair_attempts: 3 # Additional cycles after the initial implementation/checks.
+evidence_dir: ".aide/local/loops/STORY-123-attempt-01" # Must match run_id.
+checks:
+  - name: "build"
+    required: true
+    executable: "" # REQUIRED: use the actual repository-approved executable.
+    args: []
+    working_directory: "."
+    timeout_seconds: 300
+    expected_evidence: "Successful build for the approved module and current diff."
+    acceptance_ids: [] # Map to real requirements or reviewed supporting checks.
+  - name: "unit-tests"
+    required: true
+    executable: ""
+    args: []
+    working_directory: "."
+    timeout_seconds: 300
+    expected_evidence: "Behavior-focused unit results mapped to acceptance criteria."
+    acceptance_ids: []
+  - name: "integration-tests"
+    required: true
+    executable: ""
+    args: []
+    working_directory: "."
+    timeout_seconds: 300
+    expected_evidence: "Approved local integration results for impacted contracts."
+    acceptance_ids: []
+  - name: "code-scan"
+    required: true
+    executable: ""
+    args: []
+    working_directory: "."
+    timeout_seconds: 300
+    expected_evidence: "Repository-required static scan results for the current diff."
+    acceptance_ids: []
+# Empty scope or required executables deliberately BLOCK execution.
+# Inapplicable checks need a reviewed plan/run-definition change and rationale.
+# Do not put command strings, pipes, redirection, scripts, or implicit downloads here.

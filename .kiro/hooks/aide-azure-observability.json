@@ -1,0 +1,29 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-azure-read-only",
+      "description": "Allow only the bounded Azure MCP and local CLI context checks.",
+      "trigger": "PreToolUse",
+      "matcher": "shell|execute_bash|powershell|@aide-azure-mcp/.*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-azure-read-only"
+      },
+      "timeout": 20,
+      "enabled": true
+    },
+    {
+      "name": "aide-azure-observation-evidence",
+      "description": "Record bounded Azure observation metadata without retaining cloud payloads.",
+      "trigger": "PostToolUse",
+      "matcher": "@aide-azure-mcp/.*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-azure-observation-evidence"
+      },
+      "timeout": 20,
+      "enabled": true
+    }
+  ]
+}

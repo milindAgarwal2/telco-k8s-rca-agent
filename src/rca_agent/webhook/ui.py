@@ -130,6 +130,10 @@ def init(app, *, graph_builder, event_watcher, local_store, query_log,
         report = event_watcher.get_incident(incident_id)
         if report is None:
             return HTMLResponse("<div class='alert alert-warning small'>Incident not found.</div>")
+        # The template reads the incident's fields off the JSON-dumped report
+        # dict ``d`` directly (``d.service_area``, ``d.potential_alarms``, ...),
+        # so no per-field context key is wired here: both the service-area and
+        # potential-alarms sections are populated purely by model_dump below.
         d = report.model_dump(mode="json")
         d["severity"] = getattr(report.severity, "value", report.severity)
         g = graph_builder.graph

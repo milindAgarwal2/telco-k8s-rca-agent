@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:9645944a8b3a1220788a914c581ca90d5a9e37bdd01723de32a466aa33432d8f",
+  "claims": [
+    {
+      "id": "claim_b1f1cabcbadd489a8771f85b624886c0",
+      "statement": "IncidentReport is the agent's output for one fault, with symptom/affected_resource/namespace/severity fields, a list of Hypothesis candidate causes, blast_radius and upstream_unhealthy, structured evidence, suggested_next_steps, and a reasoning_mode provenance field.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/models/incident.py",
+          "version": "repo-file-v1:sha256:ed5cf5ccdb02996623fb03d30837a735036369d173014aede4eee600dad56cf7"
+        }
+      ]
+    },
+    {
+      "id": "claim_51a60c7323e543b48d1f4f709aa87e8a",
+      "statement": "A Hypothesis carries a cause, a human-readable evidence_chain, a confidence score from 0.0 to 1.0, and supporting evidence; Evidence has a category and citations; a Citation points to the primary evidence (log, metric/PromQL, event, runbook, graph, or change).",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/models/incident.py",
+          "version": "repo-file-v1:sha256:ed5cf5ccdb02996623fb03d30837a735036369d173014aede4eee600dad56cf7"
+        }
+      ]
+    },
+    {
+      "id": "claim_8751437c23d4493e9892fdd4b6137983",
+      "statement": "The service-anchored model resolves a fault to a stable anchor in priority order service, then owning workload, then pod, records the pods behind it in affected_pods, and is verified by anchor tests that prefer the service and fall back to workload then pod.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/models/incident.py",
+          "version": "repo-file-v1:sha256:ed5cf5ccdb02996623fb03d30837a735036369d173014aede4eee600dad56cf7"
+        },
+        {
+          "resource": "repo://src/rca_agent/reasoning/steps.py",
+          "version": "repo-file-v1:sha256:94b8ac06a5c818740acc790796d58fc23d995fbbdf2cad4f2fec65613ac6c5e4"
+        },
+        {
+          "resource": "repo://tests/test_anchor_phase1.py",
+          "version": "repo-file-v1:sha256:f6ff4c3075515e5cdd0b01d863360f3956455a5ec0e4e12658a1d475a2db3524"
+        }
+      ]
+    },
+    {
+      "id": "claim_2ce3b9eb3c814ab89b6164df6558152a",
+      "statement": "The anchor deduplicates sibling pods: five pods behind one Service that fail identically produce a single service-anchored incident listing all the pods rather than one incident per pod.",
+      "evidence": [
+        {
+          "resource": "repo://tests/test_anchor_phase1.py",
+          "version": "repo-file-v1:sha256:f6ff4c3075515e5cdd0b01d863360f3956455a5ec0e4e12658a1d475a2db3524"
+        }
+      ]
+    },
+    {
+      "id": "claim_eb567f24b7bb4e4699d54227032703bc",
+      "statement": "upstream_unhealthy is the candidate-cause side (dependencies via calls edges that are themselves unhealthy) and blast_radius is the downstream impact side of the graph walk.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/models/incident.py",
+          "version": "repo-file-v1:sha256:ed5cf5ccdb02996623fb03d30837a735036369d173014aede4eee600dad56cf7"
+        }
+      ]
+    },
+    {
+      "id": "claim_4f011e2721ed448c9fdc5cfd2cb1256f",
+      "statement": "An incident is created active and reconcile_status flips it to inactive with resolved_at set only when every pod in affected_pods is healthy again in the current graph (strict recovery), where a pod missing from the graph counts as recovered.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/detection/event_watcher.py",
+          "version": "repo-file-v1:sha256:86da39807db947fbb8fc2816ea421ec9330607ad875301ae41a5f078ab75b3e5"
+        },
+        {
+          "resource": "repo://src/rca_agent/models/incident.py#L58-L82",
+          "version": "repo-lines-v1:sha256:da3a0b5c223c92dea2ea33d0ec6ea2fbd3317bf921e4864a51126579988828ad:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEwMjZmNGEwYTMyNjAzZDhhYTk2ZDNmOWE1ZTEyNmI3NjIwY2VmMTNiMmVmYjE1OTRhOTJjYTkyYWY2OGJjYzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVlNjMwYzc1MmY0YWNjNjM0OGU0Yzg3ODVjZjc2N2E4Yjk4NmZmMWM3MjEyZTk1ZGIwOGFmOGU0ZGFkYWNkY2MifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_0e51c91dbf69469692e643d318ad4c66",
+      "statement": "related_incidents is a deterministic pattern flag linking incidents with the same failure signature on a different resource within the correlation window, and it never changes hypothesis confidence or claims what the shared cause is.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/models/incident.py",
+          "version": "repo-file-v1:sha256:ed5cf5ccdb02996623fb03d30837a735036369d173014aede4eee600dad56cf7"
+        }
+      ]
+    },
+    {
+      "id": "claim_06408fa17c404f2d92fe2b8867eb875e",
+      "statement": "When reconcile_status resolves an incident it clears the status-detection latches for its pods (discards each from _status_incident_open and removes its _unhealthy_streak entry) so the same pod can re-fire a fresh incident if it breaks again.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/detection/event_watcher.py",
+          "version": "repo-file-v1:sha256:86da39807db947fbb8fc2816ea421ec9330607ad875301ae41a5f078ab75b3e5"
+        }
+      ]
+    },
+    {
+      "id": "claim_aa2b282eaa6e4f00b61b9f0ee9f9a911",
+      "statement": "Anchor dedup (_merge_into_open_anchor) merges sibling pods that share the same service or workload anchor into one open incident and applies only to service/workload anchors, while correlation (_correlate) links different anchors sharing an identical blanked failure signature within the correlation window.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/detection/event_watcher.py",
+          "version": "repo-file-v1:sha256:86da39807db947fbb8fc2816ea421ec9330607ad875301ae41a5f078ab75b3e5"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T20:42:17.288Z"
+  }
+}

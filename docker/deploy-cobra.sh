@@ -36,6 +36,22 @@
 #     SERVICE_AREA_MAP_HOST=~/resilience_common_services_pod_mapping.xlsx \
 #       ./deploy-cobra.sh --with-llm --app-tag 0.9.0
 #
+# PostgreSQL datastore (mandatory, D1): a PostgreSQL container ('rca-agent-db')
+# is now started automatically alongside the agent, with a host-mounted data
+# volume so incident history and the runbook query log survive restarts. The
+# agent is wired to it via RCA_DATABASE_URL. Tunables (all overridable by env):
+#   PG_IMAGE        (default postgres:16)        pinned PG image
+#   PG_CONTAINER_NAME (default rca-agent-db)      container name
+#   PG_PORT         (default 5432)               host port (loopback)
+#   PG_DB           (default rca)                database name
+#   PG_USER         (default rca)                database user
+#   PG_PASSWORD     (default: generated)         MUST come from env/file, never
+#                                                hardcoded (Req 6.1). If empty a
+#                                                strong random one is generated.
+#   PG_DATA_HOST    (default ~/rca-pgdata)       host dir for the PG data volume
+# Example (supply your own password):
+#   PG_PASSWORD=... ./deploy-cobra.sh --with-llm --app-tag 0.9.0
+#
 # LLM sidecar prerequisites (only for --with-llm):
 #   - the sidecar image tarball  (rca-agent-sidecar-<tag>.tar.gz) in this dir, AND
 #   - the GGUF model file at $LLM_GGUF_HOST (default ~/models/model.gguf).
@@ -69,6 +85,23 @@ KUBECONFIG_HOST="${KUBECONFIG_HOST:-$HOME/.kube/config}"
 # is set, enabling the "Service area impacted" panel. If absent, the feature
 # stays inert and the agent runs normally.
 SERVICE_AREA_MAP_HOST="${SERVICE_AREA_MAP_HOST:-$HOME/resilience_common_services_pod_mapping.xlsx}"
+
+# PostgreSQL datastore config (mandatory, D1 / Req 1.3-1.4, 6.1). A pinned PG
+# container is started alongside the agent with a host-mounted data volume, and
+# RCA_DATABASE_URL is injected into the agent run (see the postgres block below).
+PG_IMAGE="${PG_IMAGE:-postgres:16}"
+PG_CONTAINER_NAME="${PG_CONTAINER_NAME:-rca-agent-db}"
+PG_PORT="${PG_PORT:-5432}"
+PG_DB="${PG_DB:-rca}"
+PG_USER="${PG_USER:-rca}"
+# Req 6.1: the DB password MUST be provided (env or a file), never hardcoded.
+# If empty, we generate a strong random one at runtime below. That ephemeral
+# password is acceptable for this single-host POC because the agent reads it in
+# the SAME script run (we build RCA_DATABASE_URL from it right away); it is NOT
+# persisted. Prefer passing PG_PASSWORD yourself for reproducible restarts.
+PG_PASSWORD="${PG_PASSWORD:-}"
+# Host dir for the PG data volume (bind-mounted so data survives container rm).
+PG_DATA_HOST="${PG_DATA_HOST:-$HOME/rca-pgdata}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -172,6 +205,61 @@ if [ "$WITH_LLM" -eq 1 ]; then
   fi
 fi
 
+# ---- PostgreSQL datastore (mandatory, D1 / Req 1.3-1.4, 6.1) ----------------
+# Start a pinned PostgreSQL container with a host-mounted data volume BEFORE the
+# agent so RCA_DATABASE_URL is live when the agent boots. Ordering is therefore:
+# optional LLM sidecar -> postgres -> agent. Mirrors the sidecar load/run/wait
+# pattern (here there is no image tarball to load; the PG image is pulled/pinned).
+
+# Req 6.1: never hardcode the password. If none was supplied, generate a strong
+# random one for this run (ephemeral; acceptable for a single-host POC since the
+# agent reads it in the same run via RCA_DATABASE_URL below).
+if [ -z "$PG_PASSWORD" ]; then
+  if command -v openssl >/dev/null 2>&1; then
+    PG_PASSWORD="$(openssl rand -hex 16)"
+  else
+    PG_PASSWORD="$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+  fi
+  log "no PG_PASSWORD provided -> generated an ephemeral random password for '$PG_CONTAINER_NAME' (single-host POC)."
+fi
+
+log "preparing PG data dir $PG_DATA_HOST ..."
+mkdir -p "$PG_DATA_HOST"
+
+log "removing any existing postgres container '$PG_CONTAINER_NAME' ..."
+docker rm -f "$PG_CONTAINER_NAME" >/dev/null 2>&1 || true
+
+# --network host to match the rest of the script; PG then listens on
+# 127.0.0.1:$PG_PORT. PGDATA points at a subdir so the bind mount stays clean.
+log "starting postgres '$PG_CONTAINER_NAME' ($PG_IMAGE) on 127.0.0.1:${PG_PORT} (data: $PG_DATA_HOST) ..."
+docker run -d \
+  --name "$PG_CONTAINER_NAME" \
+  --restart unless-stopped \
+  --network host \
+  -e POSTGRES_DB="$PG_DB" \
+  -e POSTGRES_USER="$PG_USER" \
+  -e POSTGRES_PASSWORD="$PG_PASSWORD" \
+  -e PGDATA=/var/lib/postgresql/data/pgdata \
+  -v "$PG_DATA_HOST":/var/lib/postgresql/data \
+  "$PG_IMAGE"
+
+log "waiting for postgres to accept connections on 127.0.0.1:${PG_PORT} ..."
+pg_ok=0
+for _ in $(seq 1 60); do
+  if docker exec "$PG_CONTAINER_NAME" pg_isready -U "$PG_USER" -d "$PG_DB" >/dev/null 2>&1; then pg_ok=1; break; fi
+  sleep 1
+done
+if [ "$pg_ok" -eq 1 ]; then
+  log "postgres is up."
+else
+  err "postgres did not become ready; recent logs:"
+  docker logs --tail 30 "$PG_CONTAINER_NAME" || true
+  die "postgres startup failed (the agent requires the database)."
+fi
+
+# Inject the connection string the agent run uses (loopback, matches --network host).
+RCA_DATABASE_URL="postgresql://$PG_USER:$PG_PASSWORD@127.0.0.1:$PG_PORT/$PG_DB"
+
 # ---- (re)start the agent ----------------------------------------------------
 log "removing any existing container '$CONTAINER_NAME' ..."
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
@@ -215,6 +303,7 @@ docker run -d \
   -e RCA_NAMESPACE="$RCA_NAMESPACE" \
   -e RCA_NF_SELECTOR="$RCA_NF_SELECTOR" \
   -e RCA_REASONING_MODE="$RCA_REASONING_MODE" \
+  -e RCA_DATABASE_URL="$RCA_DATABASE_URL" \
   -e RCA_RUNBOOK_RAG_SEMANTIC="$RCA_SEMANTIC_FLAG" \
   -e RCA_LLM_BASE_URL="http://127.0.0.1:${LLM_PORT}" \
   -e RCA_PORT="$RCA_PORT" \
@@ -238,7 +327,8 @@ if [ "$ok" -eq 1 ]; then
   OK rca-agent ${IMAGE_TAG} running (reasoning_mode=${RCA_REASONING_MODE}).
   Tunnel + view:  ssh -L ${RCA_PORT}:localhost:${RCA_PORT} eagamil@10.242.70.7
                   http://localhost:${RCA_PORT}/
-  Manage:         docker logs -f ${CONTAINER_NAME}  |  docker rm -f ${CONTAINER_NAME}${WITH_LLM:+ ${SIDECAR_NAME}}
+  Manage:         docker logs -f ${CONTAINER_NAME}  |  docker rm -f ${CONTAINER_NAME} ${PG_CONTAINER_NAME}${WITH_LLM:+ ${SIDECAR_NAME}}
+  Database:       postgres container '${PG_CONTAINER_NAME}' (data: ${PG_DATA_HOST})
 EOF
 else
   err "dashboard did not come up on port ${RCA_PORT}. Recent logs:"

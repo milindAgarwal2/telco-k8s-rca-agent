@@ -46,3 +46,11 @@ resilience_common_services_pod_mapping.xlsx
 service-area-impact.xlsx
 /[0-9]*.json
 Screenshot*.png
+# AIDE-BASELINE:START
+.aide/local/
+.framework-governance/
+.aide/**/__pycache__/
+.aide/**/*.py[cod]
+.kiro/**/__pycache__/
+.kiro/**/*.py[cod]
+# AIDE-BASELINE:END

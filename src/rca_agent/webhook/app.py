@@ -83,6 +83,77 @@ _event_watcher = EventWatcher(settings, _graph_builder, flow_factory=lambda: _fl
 _local_store = get_local_store(settings.runbook_store_path)
 _query_log = get_query_log(settings.runbook_query_log_max_entries)
 
+# Durable datastore (Store bundle: Database pool + IncidentStore + QueryLogStore).
+# Constructed/connected/rehydrated in the lifespan startup (see _startup_store);
+# endpoints (e.g. /readyz, Task 5.3) read this to report DB readiness. None until
+# the lifespan has run its startup step.
+_store = None
+
+
+def _startup_store_construct() -> None:
+    """Construct the durable store (FAST, synchronous) and wire write-through.
+
+    Runs before the app serves traffic but does NOT connect to the DB -- it only
+    builds the Store graph and injects the stores into EventWatcher/QueryLog so
+    write-through is active. A missing ``RCA_DATABASE_URL`` raises
+    ``ConfigurationError`` here (the intended fail-fast, Req 4.3). Connecting +
+    schema + rehydrate are deferred to ``_startup_store_connect`` as a BACKGROUND
+    task so an unreachable DB never blocks startup (same non-blocking principle
+    as the initial graph build); ``/readyz`` reflects DB readiness once it
+    connects.
+    """
+    global _store
+    from rca_agent.store import get_store
+
+    store = get_store()  # fail-fast on missing RCA_DATABASE_URL (Req 4.3)
+    _store = store
+    # Write-through wiring (Tasks 6/7): active immediately; persists are
+    # non-fatal, so they simply no-op/log until the background connect succeeds.
+    _event_watcher._incident_store = store.incidents
+    _query_log._store = store.query_log
+
+
+async def _startup_store_connect() -> None:
+    """Background: connect to the DB, ensure schema, rehydrate the caches.
+
+    Deferred off the startup path so a slow/unreachable DB does not block the
+    app from serving (Req 5.1 non-fatal; the initial graph build uses the same
+    background pattern). Rehydration (Req 3.1, 9.3) happens as soon as the DB is
+    reachable; until then ``/incidents``/``/runbook-queries`` serve the
+    in-memory caches and ``/readyz`` reports not-ready. All calls are blocking,
+    so each runs in a worker thread (D5).
+    """
+    store = _store
+    if store is None:
+        return
+    try:
+        await asyncio.to_thread(store.db.connect_with_retry,
+                                attempts=settings.db_connect_attempts,
+                                max_delay=settings.db_connect_max_delay,
+                                connect_timeout=settings.db_connect_timeout)
+        await asyncio.to_thread(store.db.ensure_schema)
+
+        # Rehydrate incidents (Req 3.1), newest-first from the DB inserted in
+        # oldest-first order to match freshly-created incidents. Only when the
+        # in-memory list is still empty so we never clobber live incidents.
+        if not _event_watcher.incidents:
+            recent = await asyncio.to_thread(store.incidents.load_recent, 200)
+            _event_watcher.incidents[:] = list(reversed(recent))
+            logger.info("rehydrated %d incident(s) from the datastore",
+                        len(_event_watcher.incidents))
+
+        # Rehydrate the runbook query log (Req 9.3).
+        entries = await asyncio.to_thread(
+            store.query_log.load_recent, settings.runbook_query_log_max_entries)
+        _query_log.rehydrate(entries)
+        logger.info("rehydrated %d runbook query-log entry(ies) from the datastore",
+                    len(entries))
+    except Exception:
+        logger.exception(
+            "datastore startup (connect/schema/rehydrate) failed; continuing "
+            "with in-memory caches (DB is non-fatal; /readyz will reflect it)"
+        )
+
 
 async def _refresh_loop() -> None:
     """Periodically rebuild the dependency graph from the cluster.
@@ -141,13 +212,20 @@ async def _lifespan(_: FastAPI):
     logger.info("rca-agent starting: mode=%s cluster=%s (initial graph build "
                 "running in background)",
                 settings.reasoning_mode, settings.cluster_enabled)
+    # Construct the durable store synchronously (FAST): this fails fast on a
+    # missing RCA_DATABASE_URL (Req 4.3) and wires write-through, but does NOT
+    # connect -- so an unreachable DB cannot block startup. The connect + schema
+    # + rehydrate run in the background (like the initial graph build); /readyz
+    # reflects DB readiness as it completes.
+    _startup_store_construct()
+    store_task = asyncio.create_task(_startup_store_connect())
     build_task = asyncio.create_task(_initial_build())
     task = asyncio.create_task(_refresh_loop())
     watch_task = asyncio.create_task(_event_watch_loop())
     try:
         yield
     finally:
-        for t in (build_task, task, watch_task):
+        for t in (store_task, build_task, task, watch_task):
             t.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await t
@@ -172,14 +250,24 @@ class WebhookResponse(BaseModel):
 
 @app.get("/healthz")
 def healthz() -> dict:
+    # Liveness MUST stay independent of the database (Req 5.2): a transient DB
+    # outage must not fail liveness, or Kubernetes would kill and restart the
+    # pod in a loop instead of letting it ride out the outage. DB readiness is
+    # reported by /readyz below, not here.
     return {"status": "ok", "version": __version__}
 
 
 @app.get("/readyz")
 def readyz() -> dict:
-    ready = _flow is not None
+    # Readiness requires BOTH the reasoning flow/graph being up AND the durable
+    # datastore being connected (Req 5.1): the DB is mandatory (D1), so it is
+    # legitimately part of readiness. _store is None until the lifespan startup
+    # runs, so guard access before calling is_ready().
+    db_ready = _store is not None and _store.db.is_ready()
+    ready = (_flow is not None) and db_ready
     return {"status": "ready" if ready else "starting",
-            "graph": _graph_builder.graph.stats()}
+            "graph": _graph_builder.graph.stats(),
+            "database": "ready" if db_ready else "not-ready"}
 
 
 @app.get("/graph/stats")
@@ -346,6 +434,18 @@ def list_incidents(limit: int = 20, status: str = "active") -> dict:
 @app.get("/incidents/{incident_id}", response_model=IncidentReport)
 def get_incident(incident_id: str) -> IncidentReport:
     report = _event_watcher.get_incident(incident_id)
+    # Durable fallback (Req 8.3): the in-memory cache is capped at 200 incidents,
+    # so an older id that has aged out of the cache still resolves from the DB.
+    # Guard _store (None before startup) and gate on is_ready() to avoid a DB
+    # call when not connected; a lookup failure is non-fatal (Req 5.3) -- log and
+    # leave report None so we still return the same 404 shape.
+    if report is None and _store is not None and _store.db.is_ready():
+        try:
+            report = _store.incidents.get(incident_id)
+        except Exception:
+            logger.warning("durable incident lookup for '%s' failed; "
+                           "serving from in-memory cache only", incident_id,
+                           exc_info=True)
     if report is None:
         raise HTTPException(status_code=404, detail=f"incident '{incident_id}' not found")
     return report

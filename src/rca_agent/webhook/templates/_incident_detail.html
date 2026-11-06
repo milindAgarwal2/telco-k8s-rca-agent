@@ -123,6 +123,50 @@
   {% endif %}
 {% endif %}
 
+{% if d.potential_alarms %}
+  {% set pa = d.potential_alarms %}
+  {% set pa_sev_badge = {"critical":"text-bg-danger","major":"text-bg-danger","warning":"text-bg-warning","minor":"text-bg-warning","info":"text-bg-info"} %}
+  <div class="fw-semibold small text-uppercase text-secondary mt-3 mb-2">Potential alarms</div>
+  {% if pa.mapped and pa.alarms %}
+    <div class="small text-secondary mb-2" style="font-size:.75rem;">
+      Candidate potential alarms that <strong>could have been raised</strong> for this pod,
+      drawn from the curated pod-alarm mapping. These are candidates only — the agent
+      does not observe alarm state, so none of these is a raised or firing alarm.
+    </div>
+    {% for a in pa.alarms %}
+      {% if a.source_citation %}
+        <div class="border rounded-3 p-2 mb-2">
+          <div class="small">
+            🔔
+            {% if a.alarm_name %}<strong>{{ a.alarm_name }}</strong>{% else %}<span class="badge text-bg-light text-secondary">name unknown</span>{% endif %}
+            ·
+            {% if a.severity %}<span class="badge {{ pa_sev_badge.get(a.severity|lower, 'text-bg-secondary') }}">{{ a.severity }}</span>{% else %}<span class="badge text-bg-light text-secondary">severity unknown</span>{% endif %}
+            <span class="badge text-bg-light text-secondary">{% if a.is_direct %}Direct{% else %}Conditional{% endif %}</span>
+          </div>
+          <div class="small text-secondary mt-1">
+            scope: {% if a.scope %}{{ a.scope }}{% else %}<span class="fst-italic">unknown</span>{% endif %}
+          </div>
+          <div class="small text-secondary mt-1">
+            mapping basis: {% if a.mapping_basis %}{{ a.mapping_basis }}{% else %}<span class="fst-italic">unknown</span>{% endif %}
+          </div>
+          {% if not a.is_direct %}
+            <div class="small text-secondary mt-1">
+              applicability: {% if a.applicability %}{{ a.applicability }}{% else %}<span class="fst-italic">unknown</span>{% endif %}
+            </div>
+          {% endif %}
+          <div class="text-secondary mt-1" style="font-size:.72rem;">
+            Source: {{ a.source_citation }}
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    <div class="small text-secondary fst-italic mb-2">
+      Potential alarms UNKNOWN — this pod is not mapped in the pod-alarm mapping workbook.
+    </div>
+  {% endif %}
+{% endif %}
+
 <div class="fw-semibold small text-uppercase text-secondary mt-3 mb-2">Impact &amp; dependencies</div>
 <div class="row g-2">
   <div class="col-md-6">

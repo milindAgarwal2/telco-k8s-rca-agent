@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "name": "neo4j-inspection",
+  "purpose": "Optional reviewed, read-only graph inspection where Graphiti retrieval is insufficient.",
+  "upstream": "project-selected Neo4j MCP implementation",
+  "version": "unresolved",
+  "license": "unresolved",
+  "integrity": {"kind": "unresolved", "value": null, "artifact_hash": null},
+  "verified_on": null,
+  "runtime": "project-selected",
+  "transport": "stdio",
+  "supported_os": ["project-selected"],
+  "capabilities": ["reviewed graph schema inspection", "bounded read query when database privileges enforce it"],
+  "setup_steps": ["Select, license-review, and pin one Neo4j MCP implementation", "Use a database role with server-enforced read privileges", "Verify its actual tool list and query restrictions against the intended database"],
+  "health_check": "MCP initialize and tools/list, followed by a separately approved harmless read only after permissions review",
+  "secret_refs": ["NEO4J_MCP_PASSWORD"],
+  "requires_explicit_configuration": true,
+  "kiro_template": {"command": "neo4j-mcp-command-must-be-configured", "args": []},
+  "corrective_action": "Review and pin the selected server, reference credentials locally, prove read-only behavior, and prevent Graphiti-managed writes from being bypassed.",
+  "permissions": "Reviewed read-only Cypher only; database-side privileges must enforce the boundary.",
+  "removal_owner": "AIDE-managed mcpServers.neo4j-inspection key only"
+}

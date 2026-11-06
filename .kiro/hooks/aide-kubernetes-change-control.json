@@ -1,0 +1,29 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-kubernetes-change-control",
+      "description": "Allow only fixed plan-bound Kubernetes change tools and validate apply plan IDs.",
+      "trigger": "PreToolUse",
+      "matcher": "@aide-kubernetes-change-mcp/.*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-kubernetes-change-control"
+      },
+      "timeout": 20,
+      "enabled": true
+    },
+    {
+      "name": "aide-kubernetes-change-evidence",
+      "description": "Record Kubernetes change metadata without manifest or cluster payloads.",
+      "trigger": "PostToolUse",
+      "matcher": "@aide-kubernetes-change-mcp/.*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-kubernetes-change-evidence"
+      },
+      "timeout": 20,
+      "enabled": true
+    }
+  ]
+}

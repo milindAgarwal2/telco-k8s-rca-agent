@@ -1,0 +1,51 @@
+# Docker build context allowlist-by-exclusion.
+#
+# The Dockerfile only COPYs: pyproject.toml, README.md, src/, and docker/.
+# Everything else is unnecessary context that slows the build and bloats the
+# daemon transfer. Critically, dist/ holds prior cobra-package-*/ image
+# tarballs (hundreds of MB each) that would otherwise be swept into every
+# subsequent build context, compounding each release. Keep this aligned with
+# the Dockerfile's COPY lines.
+
+# Version control & local virtualenv
+.git
+.gitignore
+.venv
+venv
+
+# Release output (saved image tarballs) — must not re-enter the build context
+dist
+
+# AIDE support plane, Kiro steering, generated wiki — not application code
+.aide
+.kiro
+openwiki
+
+# Tests and specs are not needed to build/run the image
+tests
+.kiro/specs
+
+# Python caches & build metadata
+**/__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# Editor / OS noise
+.vscode
+.idea
+.DS_Store
+
+# Local env / secrets — never ship into an image
+.env
+*.env
+
+# Planning notes & binary artifacts at the repo root (not part of the service)
+PLAN*.md
+NOTES-*.md
+*.pptx
+*.docx
+*.xlsx

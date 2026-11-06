@@ -175,6 +175,25 @@ def build_incident_pptx(report, owners: dict | None = None) -> bytes:
         add_field(s3, 0.6, min(y, 6.3), 12.0, 0.6, "Service area impacted", sa_text)
         y += 0.9
 
+    pa = getattr(report, "potential_alarms", None)
+    if pa is not None and pa.mapped:
+        # Candidate alarms only -- never confirmed/active. Pair each surfaced
+        # alarm with its source citation; suppress alarms lacking a citation
+        # to stay consistent with the UI (R4 AC2), then cap the list for layout.
+        lines = [
+            f"{a.alarm_name} — {a.source_citation}"
+            for a in pa.alarms
+            if a.source_citation
+        ]
+        if lines:
+            shown = lines[:6]
+            pa_text = "; ".join(shown)
+            if len(lines) > 6:
+                pa_text += f"  (+{len(lines) - 6} more)"
+            add_field(s3, 0.6, min(y, 6.3), 12.0, 0.6,
+                      "Potential Alarms (candidates)", pa_text, value_size=12)
+            y += 0.9
+
     if report.suggested_next_steps:
         sb = s3.shapes.add_textbox(Inches(0.6), Inches(min(y, 6.3)), Inches(12.0), Inches(0.9))
         sf = sb.text_frame; sf.word_wrap = True

@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-validate-change",
+      "description": "Run safe local quick checks after relevant edits.",
+      "trigger": "PostToolUse",
+      "matcher": "write|write_file|edit|edit_file|apply_patch|fs_write|shell|execute_bash|@filesystem/.*|@git/.*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-validate-change"
+      },
+      "timeout": 120,
+      "enabled": true
+    }
+  ]
+}

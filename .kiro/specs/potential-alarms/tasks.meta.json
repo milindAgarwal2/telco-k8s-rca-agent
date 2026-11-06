@@ -1,0 +1,680 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.1 Implement `CandidateAlarm` and `PotentialAlarms` in `src/rca_agent/alarms/models.py`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909751396
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793912467111
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793913664596
+      }
+    ],
+    "1.2 Write property test P6 for verbatim field preservation": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909751596
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793913825911
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793914438503
+      }
+    ],
+    "1.3 Write property test P7 for ASCII-safe, bounded `summary_line()`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909751693
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793913828444
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932402054
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932440760
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793934324775
+      }
+    ],
+    "2.1 Implement `src/rca_agent/alarms/loader.py`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909751814
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793913829593
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793914436587
+      }
+    ],
+    "2.2 Write property test P4 for grouping count equals matching rows": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909751963
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793915138114
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916173125
+      }
+    ],
+    "2.3 Write property test P5 for Direct-before-Conditional stable ordering": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909752145
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793915138595
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916174039
+      }
+    ],
+    "3.1 Implement `src/rca_agent/alarms/index.py`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909752259
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793915135578
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916171677
+      }
+    ],
+    "3.2 Add `src/rca_agent/alarms/__init__.py` re-exports": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909752383
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916201943
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916619827
+      }
+    ],
+    "3.3 Write property test P1 for total, non-raising `by_pod`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909752503
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916207537
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916621155
+      }
+    ],
+    "3.4 Write property test P2 for exact-then-stem-then-UNKNOWN resolution": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909752608
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916209391
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916622087
+      }
+    ],
+    "3.5 Write property test P3 for UNKNOWN absent pods and no fabrication": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909752698
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916210889
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916623856
+      }
+    ],
+    "3.6 Write property test P8 for deterministic lookups": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909752787
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916667773
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916894291
+      }
+    ],
+    "4.1 Implement `tests/fixtures/make_pod_alarm_fixture.py` and generate the workbook": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909752891
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793912468948
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793913666017
+      }
+    ],
+    "5. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909752979
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793917892729
+      }
+    ],
+    "6.1 Add `pod_alarm_map_path` to `src/rca_agent/config.py`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909753069
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793912470011
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793913667001
+      }
+    ],
+    "7.1 Add `potential_alarms` field to `src/rca_agent/models/incident.py`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909753155
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793913830941
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793914437633
+      }
+    ],
+    "7.2 Write property test P10 for feature-off serialization": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909753245
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793915139811
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916174987
+      }
+    ],
+    "8.1 Add `potential_alarms` to `src/rca_agent/reasoning/state.py`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909753373
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916203648
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916624748
+      }
+    ],
+    "8.2 Implement `build_potential_alarms` in `src/rca_agent/reasoning/steps.py`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909753483
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793917907131
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793918101570
+      }
+    ],
+    "8.3 Wire the step into `src/rca_agent/reasoning/extractive.py`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909753582
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793918116934
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793918386191
+      }
+    ],
+    "8.4 Write property test P9 for ranking invariance": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909753720
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793918418422
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932404280
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793934340259
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793936918974
+      }
+    ],
+    "8.5 Write loader and index example/edge tests (mirror `test_impact_loader.py`)": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909753882
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793918420011
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932404887
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793934343177
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793936920334
+      }
+    ],
+    "8.6 Write pipeline and graceful-degradation tests (mirror `test_impact_pipeline.py`)": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909753964
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793918421012
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932405462
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793934344798
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793936921753
+      }
+    ],
+    "9. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909754063
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932405634
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793945527368
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793945908407
+      }
+    ],
+    "10.1 Add the \"Potential Alarms\" block to `webhook/templates/_incident_detail.html`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909754159
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793918413456
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932405807
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793934347729
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793936923170
+      }
+    ],
+    "10.2 Supply the render context in `src/rca_agent/webhook/ui.py`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909754497
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932406017
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793937763620
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793938275373
+      }
+    ],
+    "10.3 Write dashboard rendering tests (mirror `test_gui_service_area.py`)": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909754656
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932406594
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793937765424
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793945504589
+      }
+    ],
+    "11.1 Add the candidate-alarm block to `src/rca_agent/webhook/pptx_report.py`": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909754783
+      },
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793918416821
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932406792
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793934349248
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793936924301
+      }
+    ],
+    "11.2 Write PPTX rendering test (mirror `test_pptx_report.py`)": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909754910
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932406991
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793937766604
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793945505432
+      }
+    ],
+    "12.1 Add `src/rca_agent/alarms/SPECS.md` and reconcile parent references": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909755050
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932407174
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793936952331
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793937737175
+      }
+    ],
+    "13. Final checkpoint - Run the verification gate": [
+      {
+        "executionId": "aae28ffa-ac63-45c2-b593-7125fee88722",
+        "chatSessionId": "sess_e254e9c5-2726-45a1-8505-2e719567a020",
+        "timestamp": 1793909755191
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793932407314
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793945927344
+      },
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793947048485
+      }
+    ],
+    "4. Build the committed test fixture": [
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793913666121
+      }
+    ],
+    "6. Add the configuration gate": [
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793913667198
+      }
+    ],
+    "2. Implement the workbook loader": [
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916174296
+      }
+    ],
+    "7. Extend the incident model": [
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916175157
+      }
+    ],
+    "3. Implement the in-memory index and factory": [
+      {
+        "executionId": "d5a2d20e-8cfc-4a29-93e0-14a33ce834fe",
+        "chatSessionId": "sess_4be3c4fc-b72f-465f-8dc2-735a3d889c29",
+        "timestamp": 1793916894481
+      }
+    ],
+    "8. Wire the reasoning step": [
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793936921905
+      }
+    ],
+    "12. Finalize folder specs and relationship references": [
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793937737441
+      }
+    ],
+    "10. Surface the section in the dashboard": [
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793945504883
+      }
+    ],
+    "11. Surface the section in the PPTX export": [
+      {
+        "executionId": "4ea2afee-761d-415c-9494-ca487838369a",
+        "chatSessionId": "sess_8296b72b-b4a7-4eeb-8aee-dad4253e54dc",
+        "timestamp": 1793945505588
+      }
+    ]
+  }
+}

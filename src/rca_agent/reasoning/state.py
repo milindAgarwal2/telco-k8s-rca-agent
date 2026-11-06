@@ -30,6 +30,7 @@ class ReasoningState:
     hypotheses: list[Hypothesis] = field(default_factory=list)
     suggested_next_steps: list[str] = field(default_factory=list)
     service_area: object = None  # ServiceAreaImpact | None (avoid import cycle)
+    potential_alarms: object = None  # PotentialAlarms | None (avoid import cycle)
 
     def add_evidence(self, ev: Evidence) -> None:
         self.evidence.append(ev)

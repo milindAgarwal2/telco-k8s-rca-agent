@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:cb98c64d9798beb64472b5954e6be255093bf64dc50ab80f08c7577708ee3780",
+  "claims": [
+    {
+      "id": "claim_59e23161925d494ea017763513a5c0d4",
+      "statement": "The agent runs locally with python3 -m venv .venv, pip install -e ., and uvicorn rca_agent.webhook.app:app --port 8080, starting in the default extractive no-LLM, no-cluster (demo graph) mode.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:05f39db16c1c646d63a7ca23d6b3cda34a5efcf07c206c44392c736608ee311d"
+        },
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        }
+      ]
+    },
+    {
+      "id": "claim_baed650c97a64b2d97f429011bfd517f",
+      "statement": "Posting tests/fixtures/alertmanager_sample.json to POST /webhook/alertmanager returns an incident report with a symptom, ranked hypotheses, and suggested next steps.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:05f39db16c1c646d63a7ca23d6b3cda34a5efcf07c206c44392c736608ee311d"
+        },
+        {
+          "resource": "repo://tests/fixtures/alertmanager_sample.json",
+          "version": "repo-file-v1:sha256:62a0c9804f876b6662b5a6282cbc973c367afce793d04b4d5a7489bfc8a027e9"
+        }
+      ]
+    },
+    {
+      "id": "claim_17f5d19f07b84d0aa4c546800b9d5c47",
+      "statement": "Optional dependency extras are llm, cluster, viz, rag, rag-semantic, pptx, and dev, and the core agent runs in no-LLM extractive mode without any of them.",
+      "evidence": [
+        {
+          "resource": "repo://pyproject.toml",
+          "version": "repo-file-v1:sha256:9a6f9f208d0557c777fbc83dc2ad3b5453f758a963947f661ce380a28f11a5bb"
+        }
+      ]
+    },
+    {
+      "id": "claim_69c3e69c083f4460a4dedfeb0215defc",
+      "statement": "The Makefile developer loop provides make test, make lint, make check (lint plus test), and make eval using the project's .venv interpreter.",
+      "evidence": [
+        {
+          "resource": "repo://Makefile",
+          "version": "repo-file-v1:sha256:864a1546e4010497c402435f71f3f09d93659c52d01278f9b761ba175b5d90ba"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T20:42:17.288Z"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-approval-gate",
+      "description": "Block protected actions without current scope, revision, gate, and target approval.",
+      "trigger": "PreToolUse",
+      "matcher": "write|write_file|edit|edit_file|apply_patch|fs_write|shell|execute_bash|powershell|.*(delegate|subagent|spawn_agent|handoff|create_thread|send_message_to_thread).*|@.*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-approval-gate"
+      },
+      "timeout": 20,
+      "enabled": true
+    }
+  ]
+}

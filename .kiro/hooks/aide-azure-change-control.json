@@ -1,0 +1,29 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-azure-change-control",
+      "description": "Allow only known Azure change MCP tools and require a valid plan ID for apply.",
+      "trigger": "PreToolUse",
+      "matcher": "@aide-azure-change-mcp/.*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-azure-change-control"
+      },
+      "timeout": 20,
+      "enabled": true
+    },
+    {
+      "name": "aide-azure-change-evidence",
+      "description": "Record Azure change tool metadata without cloud payloads or parameters.",
+      "trigger": "PostToolUse",
+      "matcher": "@aide-azure-change-mcp/.*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-azure-change-evidence"
+      },
+      "timeout": 20,
+      "enabled": true
+    }
+  ]
+}

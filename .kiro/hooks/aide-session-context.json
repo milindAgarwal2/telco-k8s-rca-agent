@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-session-context",
+      "description": "Load minimal task, branch, scope, decision, and evidence context at IDE start.",
+      "trigger": "SessionStart",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-session-context"
+      },
+      "timeout": 20,
+      "enabled": true
+    }
+  ]
+}

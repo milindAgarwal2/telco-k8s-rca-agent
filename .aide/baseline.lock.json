@@ -1,0 +1,21 @@
+{
+  "baseline_version": "0.16.11",
+  "components": [
+    "optional-agents",
+    "profiles",
+    "shared",
+    "workflows"
+  ],
+  "excluded_items": [],
+  "flavor": "full",
+  "installed_at": "2026-11-03T19:14:50+00:00",
+  "integrations": [],
+  "kiro_target": "cli2",
+  "profiles": [
+    "bash",
+    "kubernetes",
+    "python"
+  ],
+  "schema_version": 1,
+  "source_manifest_hash": "774a9b47fa7dca0984b3d0a5fa39d9c096e70333a126b43119c3090a81a520f3"
+}

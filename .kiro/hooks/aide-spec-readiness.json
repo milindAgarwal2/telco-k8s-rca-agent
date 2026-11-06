@@ -1,0 +1,28 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-spec-readiness-task",
+      "description": "Require structurally ready and explicitly reviewed specs before task execution.",
+      "trigger": "PreTaskExec",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-spec-readiness --phase task"
+      },
+      "timeout": 30,
+      "enabled": true
+    },
+    {
+      "name": "aide-spec-readiness-tool",
+      "description": "Recheck spec readiness before protected implementation actions.",
+      "trigger": "PreToolUse",
+      "matcher": "write|write_file|edit|edit_file|apply_patch|fs_write|shell|execute_bash|.*(delegate|subagent|spawn_agent|handoff|create_thread|send_message_to_thread).*|@.*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-spec-readiness --phase tool"
+      },
+      "timeout": 30,
+      "enabled": true
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "name": "aide-action-first-responses",
+  "source": "https://github.com/ayghri/i-have-adhd",
+  "revision": "0a84de401019a3a822248df586d88a2b56f8c6af",
+  "upstream_path": "skills/i-have-adhd",
+  "license": "MIT",
+  "license_source": "https://github.com/ayghri/i-have-adhd/blob/0a84de401019a3a822248df586d88a2b56f8c6af/LICENSE",
+  "retrieved_on": "2026-09-16",
+  "upstream_files_sha256": {
+    "agents/gemini.toml": "5108a6123beb9df24846e0dd3f902c652d18522dfbc56e5762032ea383041c62",
+    "agents/openai.yaml": "2c51291283dcefdca43ca6b0c08172f225c7c26a9783ec444d6bdfa51ca96f8f",
+    "LICENSE": "8acbb618089b738404f76ac60fca1aaa995d9a87995eddf95f0b777acd7f7d2c",
+    "SKILL.md": "3170b16ace00aecb0dd7feb54c0b5aa642e7502acda06ecd24fd89a11c7127e9"
+  },
+  "local_additions": [
+    "LICENSE",
+    "README.md",
+    "source-info.json"
+  ],
+  "note": "The skill and agent metadata are adapted to a generic professional name, activation phrase and introductory wording. The original pinned source paths and upstream hashes remain recorded. LICENSE is unmodified from the pinned repository root. README.md and source-info.json are AIDE integration notes; the latter is excluded from its own bundled-file hashes.",
+  "upstream_name": "i-have-adhd",
+  "adaptation_version": "0.10.1",
+  "local_adaptations": [
+    "SKILL.md",
+    "agents/openai.yaml",
+    "agents/gemini.toml"
+  ],
+  "bundled_files_sha256": {
+    "agents/gemini.toml": "d081a44a3ce3d79b1bfce8d43a960f38cd4e287dd7586d46a5066c8b25b61481",
+    "agents/openai.yaml": "fc7d2eed2eb0b4b8f5e19669af5ba921a4debe4e06db776c9fa51bff9d61783e",
+    "LICENSE": "8acbb618089b738404f76ac60fca1aaa995d9a87995eddf95f0b777acd7f7d2c",
+    "README.md": "10d498273fd6757c33b369e8c9cda54b3d384576e8e1fc41f9fdbb6ea83de787",
+    "SKILL.md": "68b82e7ac9613926c9a2c13b45a5430b0dc7eaedc806e9842cfe47715412c6b5"
+  }
+}

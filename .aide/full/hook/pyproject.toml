@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aide-kiro-hooks"
+version = "0.1.0"
+description = "Deterministic AIDE workflow hooks for Kiro"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+aide-hook = "aide_hooks.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aide_hooks"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+

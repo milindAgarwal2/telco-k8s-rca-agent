@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "knowledge_plane": "replace-with-stable-plane-id",
+  "service": {
+    "id": "replace-with-stable-service-id",
+    "name": "Replace with service name",
+    "kind": "microservice",
+    "status": "draft",
+    "description": "Replace with a concise, evidence-backed responsibility."
+  },
+  "dependencies": [],
+  "interfaces": [],
+  "events": []
+}

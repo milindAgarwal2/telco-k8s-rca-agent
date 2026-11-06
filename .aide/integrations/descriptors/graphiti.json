@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "name": "graphiti",
+  "purpose": "Connect to an existing remote Graphiti service when the packaged local Spec Brain runtime is not selected.",
+  "upstream": "https://github.com/getzep/graphiti",
+  "version": "mcp-v1.0.2",
+  "license": "Apache-2.0",
+  "integrity": {"kind": "upstream-tag", "value": "mcp-v1.0.2", "artifact_hash": null},
+  "verified_on": "2026-09-06",
+  "runtime": "Python >=3.10; approved existing Graphiti service preferred",
+  "transport": "streamable-http",
+  "supported_os": ["service-dependent", "Windows client", "Linux client", "macOS client"],
+  "capabilities": ["project-scoped temporal search", "project-scoped entity/fact retrieval", "reviewed ingestion and maintenance only through separately approved agents"],
+  "setup_steps": ["Prefer an existing approved Graphiti service pinned to mcp-v1.0.2", "Configure its explicit Neo4j backend, model endpoint, embedding model, costs, and data-handling policy outside this repository", "Set GRAPHITI_MCP_URL locally and review exposed tools plus service-side project authorization"],
+  "health_check": "MCP initialize, initialized notification, and tools/list only; do not call add, delete, or clear tools",
+  "secret_refs": ["GRAPHITI_MCP_URL"],
+  "requires_explicit_configuration": true,
+  "kiro_template": {"url": "${GRAPHITI_MCP_URL}"},
+  "corrective_action": "Set GRAPHITI_MCP_URL to the approved project-scoped service, verify tool permissions, and leave mutating tools disabled unless separately authorized.",
+  "permissions": "Default agents receive retrieval only. Group/project namespace is organization, not authorization. Never bypass Graphiti with unrestricted Neo4j writes.",
+  "removal_owner": "AIDE-managed mcpServers.graphiti key only",
+  "experimental": true
+}

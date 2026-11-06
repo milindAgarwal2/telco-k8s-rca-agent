@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "name": "openwiki",
+  "purpose": "Generate or refresh source-linked wiki candidates through a separately configured OpenWiki runtime.",
+  "upstream": "https://github.com/langchain-ai/openwiki",
+  "version": "0.4.3",
+  "license": "MIT",
+  "integrity": {
+    "kind": "upstream-tag",
+    "value": "0.4.3",
+    "artifact_hash": null
+  },
+  "verified_on": "2026-09-07",
+  "runtime": "Node.js >=22; OpenWiki Kiro integration",
+  "transport": "stdio",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "capabilities": [
+    "scoped source-linked wiki candidate initialization or refresh"
+  ],
+  "setup_steps": [
+    "Install and pin openwiki@0.4.3 from an approved npm source",
+    "Use the project-local OpenWiki skill and openwiki mcp --host kiro definition",
+    "Disable telemetry and do not configure external connectors or a separate model provider"
+  ],
+  "health_check": "Resolve the reviewed command, then perform MCP initialize and tools/list without invoking a wiki generation tool",
+  "secret_refs": [],
+  "requires_explicit_configuration": true,
+  "kiro_template": {
+    "command": "openwiki",
+    "args": [
+      "mcp",
+      "--host",
+      "kiro"
+    ],
+    "env": {
+      "DO_NOT_TRACK": "1",
+      "OPENWIKI_TELEMETRY_DISABLED": "1"
+    },
+    "timeout": 120000,
+    "requestTimeout": 120000
+  },
+  "corrective_action": "Install the approved OpenWiki package, verify the local Kiro MCP integration, and stop rather than configuring an external model provider.",
+  "permissions": "Repository read access and openwiki candidate writes only; generated pages remain drafts.",
+  "removal_owner": "AIDE-managed mcpServers.openwiki key only"
+}

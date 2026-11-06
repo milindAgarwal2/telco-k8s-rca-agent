@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "name": "kubernetes",
+  "purpose": "Project-local bounded observation plus separately enabled plan-bound namespaced create/update.",
+  "upstream": "AIDE packaged kubectl adapters",
+  "version": "0.1.0",
+  "license": "MIT for AIDE adapter; kubectl is Apache-2.0 and not redistributed",
+  "integrity": "Frozen local uv projects; kubectl supplied by the operator",
+  "runtime": "Python 3.10+ and kubectl",
+  "transport": "stdio",
+  "supported_os": [
+    "windows",
+    "linux",
+    "macos"
+  ],
+  "capabilities": [
+    "namespace observation",
+    "bounded logs",
+    "server-side dry-run",
+    "plan-bound server-side apply"
+  ],
+  "setup_steps": [
+    "Prepare both packaged runtimes",
+    "Set KUBECONFIG externally",
+    "Verify the context and namespace derived from KUBECONFIG",
+    "Optionally create an ignored target override when explicit pinning is required",
+    "Keep the change server disabled until local policy and approvals are ready"
+  ],
+  "health_check": "Call aide_kubernetes_status and aide_kubernetes_change_status; then verify context through the observer",
+  "secret_refs": [
+    "KUBECONFIG"
+  ],
+  "kiro_template": {
+    "servers": [
+      "aide-kubernetes-mcp",
+      "aide-kubernetes-change-mcp"
+    ]
+  },
+  "permissions": {
+    "observation": "read-only fixed tools",
+    "mutation": "disabled by default; plan-bound namespaced server-side apply only"
+  },
+  "removal_owner": "aide-baseline full flavor"
+}

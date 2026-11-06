@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:7dafc76303e0b7a768270aa719e3485afab5ccac964f996b94d310c0f04e4e3e",
+  "claims": [
+    {
+      "id": "claim_899e854355e54711a991329b538e4916",
+      "statement": "RCA (Root-Cause Analysis) in this project means a read-only agent that detects faults in a Kubernetes-hosted 5G core and explains their root cause rather than remediating.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:05f39db16c1c646d63a7ca23d6b3cda34a5efcf07c206c44392c736608ee311d"
+        }
+      ]
+    },
+    {
+      "id": "claim_349581b7e3a64fe0a4decb042828eebf",
+      "statement": "UPF (User Plane Function) and SMF (Session Management Function) are 5G core network functions, used in the headline example where a UPF pod is OOMKilled after a ConfigMap memory-limit change and SMF shows resulting errors.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:05f39db16c1c646d63a7ca23d6b3cda34a5efcf07c206c44392c736608ee311d"
+        },
+        {
+          "resource": "repo://src/rca_agent/tools/query_tools.py",
+          "version": "repo-file-v1:sha256:c484ecda5fda55e9801d7463211662bcc62e91ebac6140162706ead69aebc7d6"
+        }
+      ]
+    },
+    {
+      "id": "claim_1233f879c39d4900a5f634baaa7b450d",
+      "statement": "RBAC (Role-Based Access Control) grants the agent's ServiceAccount only get, list, and watch permissions so Kubernetes refuses any write even if the model attempts one.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:05f39db16c1c646d63a7ca23d6b3cda34a5efcf07c206c44392c736608ee311d"
+        }
+      ]
+    },
+    {
+      "id": "claim_64a79b442bf743d08ad35d81a38bdf44",
+      "statement": "RAG (Retrieval-Augmented Generation) retrieves runbook guidance for humans, and the optional LLM (Large Language Model), served as a local llama.cpp sidecar from a GGUF model file, only re-ranks and explains hypotheses when reasoning_mode is llm.",
+      "evidence": [
+        {
+          "resource": "repo://docker/SIDECAR.md",
+          "version": "repo-file-v1:sha256:15f21373f120130ce5b31aec5dfd0bda2a44034fbea5921ca143d423a1962b96"
+        },
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        },
+        {
+          "resource": "repo://src/rca_agent/rag/runbook_retriever.py",
+          "version": "repo-file-v1:sha256:67f2c093b2a45f678cb3d752eaf3200c6ee5d14c4ce51b4f4084789fc958a93c"
+        }
+      ]
+    },
+    {
+      "id": "claim_b56aef51d3be4a9ab6799f6af419c512",
+      "statement": "blast_radius is the downstream impact side of the graph walk and the anchor (affected_anchor/anchor_kind) is the stable entity a fault is attributed to, resolved as service then workload then pod.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/models/incident.py",
+          "version": "repo-file-v1:sha256:ed5cf5ccdb02996623fb03d30837a735036369d173014aede4eee600dad56cf7"
+        }
+      ]
+    },
+    {
+      "id": "claim_3c7e435608494a21b3c72c5c35ccc3eb",
+      "statement": "Extractive mode is the default deterministic no-LLM reasoning mode, and a calls edge means A depends on B (B upstream of A) and is derived only from grounded configuration signals rather than guessed.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:05f39db16c1c646d63a7ca23d6b3cda34a5efcf07c206c44392c736608ee311d"
+        },
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        },
+        {
+          "resource": "repo://src/rca_agent/graph/dependency_graph.py",
+          "version": "repo-file-v1:sha256:d39aa6126d26a29405a0106594ac57a9ee4cf1feb15bf8f7b2aa29b72477147b"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T19:34:26.963Z"
+  }
+}

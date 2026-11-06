@@ -1,0 +1,56 @@
+# Version control and dependency trees
+.git/
+node_modules/
+
+# Generated build output
+build/
+dist/
+target/
+
+# Temporary and editor files
+tmp/
+temp/
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Compiled and binary files
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.o
+*.obj
+*.class
+*.jar
+*.war
+*.ear
+*.pyc
+*.pdb
+*.bin
+
+# Core dumps and logs
+core.[0-9]*
+*.core
+*.dmp
+logs/
+*.log
+
+# Secrets, credentials, and production extracts
+.env
+.env.*
+secrets/
+credentials/
+production-data/
+data-extracts/
+database-dumps/
+*.dump
+*.sql.gz
+*.pem
+*.key
+*.p12
+*.pfx

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "baseline_version": "<locked-version>",
+  "flavor": "minimal",
+  "profiles": [],
+  "components": ["shared", "workflows", "profiles"],
+  "module_mappings": [],
+  "integrations": [],
+  "kiro_target": "current",
+  "validation": [
+    {
+      "name": "replace-with-reviewed-check",
+      "executable": "tool-name",
+      "args": ["arg1"],
+      "working_directory": ".",
+      "timeout_seconds": 120,
+      "required": true,
+      "expected_evidence": "observable result this check proves"
+    }
+  ]
+}

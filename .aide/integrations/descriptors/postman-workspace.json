@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "name": "postman-workspace",
+  "purpose": "Optional Postman workspace/API metadata access when offline collection files are insufficient.",
+  "upstream": "project-selected Postman workspace integration",
+  "version": "unresolved",
+  "license": "unresolved",
+  "integrity": {"kind": "unresolved", "value": null, "artifact_hash": null},
+  "verified_on": null,
+  "runtime": "project-selected",
+  "transport": "stdio",
+  "supported_os": ["project-selected"],
+  "capabilities": ["reviewed workspace and collection metadata"],
+  "setup_steps": ["Prefer offline collection analysis", "When a workspace requirement exists, select and pin a reviewed integration", "Reference a least-privilege local credential and verify no secret values are returned or committed"],
+  "health_check": "MCP initialize and tools/list; no collection or API request is sent during installation",
+  "secret_refs": ["AIDE_POSTMAN_TOKEN"],
+  "requires_explicit_configuration": true,
+  "kiro_template": {"command": "postman-workspace-mcp-command-must-be-configured", "args": [], "env": {"POSTMAN_API_KEY": "${AIDE_POSTMAN_TOKEN}"}},
+  "corrective_action": "Keep this disabled unless a reviewed workspace requirement cannot be met from repository collection files.",
+  "permissions": "Metadata reads by default; workspace mutation and collection execution are separately authorized.",
+  "removal_owner": "AIDE-managed mcpServers.postman-workspace key only"
+}

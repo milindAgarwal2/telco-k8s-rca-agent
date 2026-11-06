@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:3991fa327ff029de1db5ff4fc4f3168cb8e978d4f10253008a6add8d9edc09dc",
+  "claims": [
+    {
+      "id": "claim_5067c4956c314484a57bd13a1823e036",
+      "statement": "The RCA agent runs as a single FastAPI process that also serves a server-rendered dashboard, with application code under src/rca_agent organized into config, webhook, detection, graph, tools, reasoning, models, rag, impact, and eval packages.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:05f39db16c1c646d63a7ca23d6b3cda34a5efcf07c206c44392c736608ee311d"
+        },
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py",
+          "version": "repo-file-v1:sha256:27dff6f5e665637eb6e3509f7d5ed4b12c87982c6c2d1ff9f4534f8b7fb07252"
+        }
+      ]
+    },
+    {
+      "id": "claim_c3dfa0a7286a4ed4b9d488cfdf0a2955",
+      "statement": "The dependency graph is built once by a module-level GraphBuilder, built eagerly as a demo graph at import when no cluster is configured, and refreshed atomically by a background loop so read endpoints never see a half-built graph.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/graph/builder.py",
+          "version": "repo-file-v1:sha256:04c9f826ccef3c75ecfde12ce04235fea1b98aa0ff2ce5fccbe0ee191cb07b8e"
+        },
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py",
+          "version": "repo-file-v1:sha256:27dff6f5e665637eb6e3509f7d5ed4b12c87982c6c2d1ff9f4534f8b7fb07252"
+        }
+      ]
+    },
+    {
+      "id": "claim_1adeecbead71410f81d60bd41ce9fff1",
+      "statement": "The application lifespan starts three background tasks (initial graph build, periodic refresh loop, event-watch loop), and a cluster build runs in a background thread so it does not block uvicorn from serving /healthz.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py",
+          "version": "repo-file-v1:sha256:27dff6f5e665637eb6e3509f7d5ed4b12c87982c6c2d1ff9f4534f8b7fb07252"
+        }
+      ]
+    },
+    {
+      "id": "claim_6683f8d0e8d84cbfb945bfc36dc0808f",
+      "statement": "Both the Alertmanager webhook and the automatic event watcher feed incidents through the same ReasoningFlow entry point and record them into one shared EventWatcher incident pool and timeline.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/detection/event_watcher.py",
+          "version": "repo-file-v1:sha256:86da39807db947fbb8fc2816ea421ec9330607ad875301ae41a5f078ab75b3e5"
+        },
+        {
+          "resource": "repo://src/rca_agent/reasoning/flow.py",
+          "version": "repo-file-v1:sha256:dbbde1d52c7a93901c1d8f356fb61782b9d8607338147fd8bff61af9d972d8d7"
+        },
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py",
+          "version": "repo-file-v1:sha256:27dff6f5e665637eb6e3509f7d5ed4b12c87982c6c2d1ff9f4534f8b7fb07252"
+        }
+      ]
+    },
+    {
+      "id": "claim_ce48d397f07f4e9797311030711e7d55",
+      "statement": "ReasoningFlow runs the deterministic extractive pipeline first and only applies the optional local LLM rerank when reasoning_mode is 'llm'.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/flow.py",
+          "version": "repo-file-v1:sha256:dbbde1d52c7a93901c1d8f356fb61782b9d8607338147fd8bff61af9d972d8d7"
+        }
+      ]
+    },
+    {
+      "id": "claim_d1d2bdcb083c44b3bef4b785794c06c9",
+      "statement": "The dependency graph is derived only from native Kubernetes objects via read-only get/list calls, with no traces and no static call map.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/graph/builder.py",
+          "version": "repo-file-v1:sha256:04c9f826ccef3c75ecfde12ce04235fea1b98aa0ff2ce5fccbe0ee191cb07b8e"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T19:34:26.963Z"
+  }
+}

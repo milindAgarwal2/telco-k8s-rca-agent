@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-knowledge-drift",
+      "description": "Identify knowledge artifacts that may have drifted after relevant changes.",
+      "trigger": "PostTaskExec",
+      "action": {
+        "type": "agent",
+        "prompt": "Run `uv run --project .aide/full/hook --offline --frozen aide-hook aide-knowledge-drift`. If `has_relevant_change` is false, stop. Otherwise inspect only the reported changed artifacts and candidate knowledge targets. Propose the narrowest HLD, LLD, folder SPECS.md, knowledge-plane descriptor, runbook, API collection, or secondary OpenWiki updates needed. Do not edit or publish them in this hook, do not write to Graphiti directly, and clearly state that a human review is required."
+      },
+      "enabled": true
+    }
+  ]
+}
+

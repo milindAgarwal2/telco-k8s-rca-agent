@@ -1,0 +1,23 @@
+{{- if .Values.postgres.enabled }}
+# ClusterIP service for the db-pg StatefulSet. In-namespace only -- never a
+# NodePort/LoadBalancer -- so the datastore is reachable by the agent but not
+# externally exposed (Req 6.3). The name matches the StatefulSet serviceName and
+# is what the agent's RCA_DATABASE_URL host points at.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "rca-agent.fullname" . }}-db-pg
+  labels:
+    {{- include "rca-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "rca-agent.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
+{{- end }}

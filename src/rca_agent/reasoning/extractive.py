@@ -6,6 +6,7 @@ LangGraph/LLM flow reuses the same steps and only adds a re-rank/explain stage.
 """
 from __future__ import annotations
 
+from rca_agent.alarms.index import load_potential_alarms_index
 from rca_agent.config import Settings, get_settings
 from rca_agent.graph.builder import GraphBuilder
 from rca_agent.graph.dependency_graph import DependencyGraph
@@ -81,6 +82,12 @@ class ExtractivePipeline:
         # incident. None when RCA_SERVICE_AREA_MAP_PATH is unset/missing.
         steps.build_service_area(
             state, load_service_area_index(self.cfg.service_area_map_path))
+        # Scoped candidate potential alarms. Resolved fresh per incident (like
+        # the service-area index) so a re-uploaded pod-alarm workbook takes
+        # effect next incident. None when RCA_POD_ALARM_MAP_PATH is
+        # unset/missing. Context-not-cause: never changes hypothesis ranking.
+        steps.build_potential_alarms(
+            state, load_potential_alarms_index(self.cfg.pod_alarm_map_path))
 
         return self._to_report(state)
 
@@ -102,6 +109,7 @@ class ExtractivePipeline:
             evidence=state.evidence,
             suggested_next_steps=state.suggested_next_steps,
             service_area=state.service_area,
+            potential_alarms=state.potential_alarms,
             reasoning_mode="extractive",
         )
         return report.ranked()

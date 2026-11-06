@@ -1,0 +1,100 @@
+{{- if .Values.postgres.enabled }}
+# db-pg: the agent's own durable datastore (Req 1). A single-replica
+# StatefulSet gives the PostgreSQL pod a stable identity and a stable PVC
+# (volumeClaimTemplates) so incident + runbook-query-log history survives pod
+# restarts and rescheduling (Req 1.2). This is NOT a cluster write path -- the
+# agent's read-only-toward-Kubernetes RBAC is unchanged (Req 1.5).
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "rca-agent.fullname" . }}-db-pg
+  labels:
+    {{- include "rca-agent.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database
+spec:
+  # Headless/ClusterIP service that fronts this StatefulSet (postgres-service.yaml).
+  serviceName: {{ include "rca-agent.fullname" . }}-db-pg
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "rca-agent.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: database
+  template:
+    metadata:
+      labels:
+        {{- include "rca-agent.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: database
+    spec:
+      # The official postgres image manages its own uid (it drops to the
+      # 'postgres' user via its entrypoint) and MUST be able to write the data
+      # dir on the PVC, so we do NOT impose readOnlyRootFilesystem or the agent's
+      # runAsNonRoot/runAsUser hardening here. fsGroup lets the mounted PVC be
+      # group-writable by the postgres process. The agent pod keeps its own
+      # strict hardening (deployment.yaml) untouched.
+      securityContext:
+        fsGroup: {{ .Values.postgres.securityContext.fsGroup | default 999 }}
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+          imagePullPolicy: {{ .Values.postgres.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "{{ .Values.postgres.database | default "rca" }}"
+            - name: POSTGRES_USER
+              value: "{{ .Values.postgres.user | default "rca" }}"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.credentialsSecret | default (printf "%s-db-pg" (include "rca-agent.fullname" .)) }}
+                  key: {{ .Values.postgres.credentialsSecretPasswordKey | default "password" }}
+            # The official image initializes PGDATA; point it at a subdir of the
+            # mount so the PVC root (which may carry a lost+found) is not used
+            # directly as the data dir.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+                - -d
+                - $(POSTGRES_DB)
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            {{- toYaml (.Values.postgres.resources | default dict) | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "rca-agent.labels" . | nindent 10 }}
+          app.kubernetes.io/component: database
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.postgres.storage.storageClassName }}
+        storageClassName: {{ .Values.postgres.storage.storageClassName }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage.size | default "1Gi" }}
+{{- end }}

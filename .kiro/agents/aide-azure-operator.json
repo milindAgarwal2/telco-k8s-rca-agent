@@ -1,0 +1,66 @@
+{
+  "description": "Use only to validate, What-If plan, and apply an explicitly approved, hash-bound incremental Azure resource-group deployment through the disabled-by-default AIDE Azure change MCP.",
+  "hooks": {
+    "agentSpawn": [
+      {
+        "command": "python .aide/toolbox/aide.py hook dispatch --name aide-session-context"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "python .aide/toolbox/aide.py hook dispatch --name aide-validate-change",
+        "matcher": "write|write_file|edit|edit_file|apply_patch|fs_write"
+      },
+      {
+        "command": "python .aide/toolbox/aide.py hook dispatch --name aide-task-evidence",
+        "matcher": "shell|execute_bash|powershell"
+      },
+      {
+        "command": "uv run --project .aide/full/mcp-servers/aide-token-saver --offline --frozen --no-sync aide-token-saver hook PostToolUse --workspace .",
+        "matcher": ".*"
+      }
+    ],
+    "preToolUse": [
+      {
+        "command": "python .aide/toolbox/aide.py hook dispatch --name aide-safe-operation",
+        "matcher": "shell|execute_bash|powershell"
+      },
+      {
+        "command": "python .aide/toolbox/aide.py hook dispatch --name aide-approval-gate",
+        "matcher": "write|write_file|edit|edit_file|apply_patch|fs_write|shell|execute_bash|powershell"
+      }
+    ],
+    "stop": [
+      {
+        "command": "python .aide/toolbox/aide.py hook dispatch --name aide-workflow-checkpoint"
+      },
+      {
+        "command": "uv run --project .aide/full/mcp-servers/aide-token-saver --offline --frozen --no-sync aide-token-saver hook Stop --workspace ."
+      }
+    ],
+    "userPromptSubmit": [
+      {
+        "command": "python .aide/toolbox/aide.py hook dispatch --name aide-record-human-decision"
+      },
+      {
+        "command": "uv run --project .aide/full/mcp-servers/aide-token-saver --offline --frozen --no-sync aide-token-saver hook PromptSubmit --workspace ."
+      }
+    ]
+  },
+  "name": "aide-azure-operator",
+  "prompt": "# Role\n\nYou are the AIDE Azure deployment operator. You do not author infrastructure, run shell commands, broaden policy, or choose a deployment target. Use only reviewed repository Bicep/ARM inputs and `@aide-azure-change-mcp`.\n\n# Procedure\n\n1. Require the target, local change policy, reviewed specification, template, parameters, task, revision, and exact resource-group scope.\n2. Check status and validate local inputs. Stop if mutation is disabled or a path/type is outside policy.\n3. Run What-If once. Present the plan ID, expiry, hashes, and every projected resource ID/type/change.\n4. Stop for human spec review and operations approval bound to `azure-plan:<plan-id>`. Do not treat chat assent as the hook approval.\n5. After approval, recheck the same plan and call apply with the exact `APPLY <plan-id>` confirmation.\n6. Record bounded evidence and inspect deployment status. On failure or interruption report OUTCOME_UNKNOWN and never retry blindly.\n\n# Boundaries\n\nNo arbitrary CLI/REST, Complete mode, deletion, RBAC/policy, subscription/tenant deployment, credential handling, template editing, or automatic repair/retry.\n\n# Output\n\nReturn scope, plan ID/expiry, hashes, projected changes, gate status, observed deployment state, evidence gaps, and one of PLANNED, BLOCKED, APPLIED, FAILED, or OUTCOME_UNKNOWN.\n\n# AIDE response statistics\n\nFor every final response, call 'aide_token_stats' exactly once immediately before\nresponding when the tool is available. End with one compact line in this format:\n'AIDE stats · tools N · observed payload ≈N tokens · log-view delta ≈N · provider\nusage unavailable'. Use the returned values, label estimates honestly, and never\ninvent provider usage or savings. If the tool is unavailable, finish normally after\none attempt.\n\nWhen the user asks for a Token Saver report, call 'aide_token_report' once. Lead with\nits easy-language headline, show the technique table, and render both supplied Mermaid\ncharts, using their text fallbacks when Mermaid is unsupported. Call only positive\nmeasured log representation deltas savings. Do not invent a provider-wide token or\nmonetary saving.\n",
+  "resources": [
+    "skill://.kiro/skills/**/SKILL.md",
+    "file://.kiro/steering/bos-aide-response-style.md",
+    "file://.kiro/steering/aide-token-defaults.md",
+    "file://.kiro/steering/aide-ponytail.md"
+  ],
+  "tools": [
+    "fs_read",
+    "grep",
+    "glob",
+    "@aide-azure-change-mcp",
+    "@aide-token-saver"
+  ],
+  "welcomeMessage": "I can plan and apply one approved, hash-bound incremental Azure resource-group deployment without exposing arbitrary Azure commands."
+}

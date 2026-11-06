@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:d6708a2e67a065c24b5559209f96d742c25ee9ca719f91c297fd577acff1ac02",
+  "claims": [
+    {
+      "id": "claim_fecf8a9682744275a9e1d134e185fa67",
+      "statement": "Alert.target selects the affected resource from the alert labels in fixed priority order pod, deployment, statefulset, service, job, instance, and Alert.name reads labels['alertname'].",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/models/alert.py#L10-L36",
+          "version": "repo-lines-v1:sha256:540b11e101be69e28dded97ec345eecc97ce65031488e3298cfd318b2b479dd1:eyJzZWxlY3RlZExpbmVDb3VudCI6MjcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImRjZjVkZjAyNzc0NmFlNjU4ODY0YzFlYTRkMjRkMzA2NTBmMWZjNGQ0ZjE0NTgxYzA3NWI1OTI1ZjFlYmZkOGYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjExYjIyOTY1ZDJhNjM4NjEzYmUxZDJhNWVjNjQyNjMwNDg5YTdjNzg1NWYzZjI0ODZkYTUzYjBmYjg1MTU5M2EiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImVlYWJlZjFkNTE5ZGM0YzlmNDMwNjFiMGJjNDkzNDE2MWNkMzNhOWJmNmYyZWJiODg5YzgxYThhNjc4ZWU0NjYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjczM2U4NDg3Yzg1ZGZkY2Y5ZmE3YjkzYzc0NmM5NDYyNWFlNDdlMTIwYzc5N2U3OTFlNzM3ZjllZDdmZmM3M2QifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_82c15b3f392f47228112ff6ac3ed1f29",
+      "statement": "ReasoningFlow.run hands the Alert to ExtractivePipeline.run, which creates one ReasoningState seeded with affected_resource = alert.target as the single mutable working object for the incident.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/extractive.py#L45-L50",
+          "version": "repo-lines-v1:sha256:60feccbea84f6d64b5f99910d1be8b5ae5038c785316c3f8977e505c1c6da5e6:eyJzZWxlY3RlZExpbmVDb3VudCI6NiwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiOWI2MTZjNGI4YTBhYzY3ZTdkMWM5ZmZkZWJiNjVhOTRlYjU5MDExZWZmZjQyNzA4MGFiYmUxNjFiZDYwOTUzYyIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiY2Q2NmFjYzBkM2E4MWVlYmNhODZkYzhhMzJkOGE2YmMyYjA3OGI3NDVjZDllNWMzYzZhYThjOTJiZTViODViZiIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiN2U3YjRhMDY5NTM0NzBkOGQ2OTA3NDE4MDhhOWZhZDAzYjE0MTFlZjIyNTdiMzNmNTA5Y2MxNDQxOGMxODY4ZiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiMWEyNmJlMTUxMTFiYWUzNjhiMGFhZmIwOTI4YTU1NTg5OTk1YjMxMGE1Nzc4ZDA0M2IyNzJjZWIwZmQyYmI0YyJ9"
+        },
+        {
+          "resource": "repo://src/rca_agent/reasoning/flow.py",
+          "version": "repo-file-v1:sha256:dbbde1d52c7a93901c1d8f356fb61782b9d8607338147fd8bff61af9d972d8d7"
+        }
+      ]
+    },
+    {
+      "id": "claim_7d2c8eec0b264e9892782522adf8c9ba",
+      "statement": "ExtractivePipeline.run threads one ReasoningState through the six steps (triage, gather_evidence, graph_walk, change_correlation, hypothesize_and_rank, build_next_steps) plus build_service_area, each step reading and mutating the same state.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/extractive.py#L48-L86",
+          "version": "repo-lines-v1:sha256:b9cf765dbd99254c80f6f4052e0c47ae91acb4d8d7951a13956a3bad45e3eb92:eyJzZWxlY3RlZExpbmVDb3VudCI6MzksImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjJjNzY4ZGYxMTkwYjc3MDNkZjg4NTU0YWM2ZGY1ODZlMTQwMmYyZTlmYzk0YzhmMzM2M2E5NWU3OGM1NzAxMDYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImMzYTg0NDQxNjgyZDFkMDBmMzY4ODJkOTI3MDQyMzU5OTNhODA0Zjg3Yjg3YTY0YzA0ZTRkYjQ5ZDI1YWVkNzQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImYxYTk4NTZiZDE1ODI0MTcxMjA1Nzg1NGMyZGEzMmI5ZDIxNGUzN2MzOWU0MTViMDk5ODYxMjhjZDU4N2EyZWEifQ"
+        },
+        {
+          "resource": "repo://src/rca_agent/reasoning/state.py",
+          "version": "repo-file-v1:sha256:0e1484ac59af907995a64a57f563d38bc834f2b10390d3a63817921ee0806f98"
+        }
+      ]
+    },
+    {
+      "id": "claim_b0c56c5bd00c466d956dad4a290a1c87",
+      "statement": "The triage step sets affected_resource from alert.target and computes the change-correlation window on the state, and the graph_walk step resolves the anchor (anchor_of) and the pods behind it (pods_of_anchor), writing anchor_id, anchor_kind, anchor_display, and affected_pods onto the state.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/steps.py",
+          "version": "repo-file-v1:sha256:94b8ac06a5c818740acc790796d58fc23d995fbbdf2cad4f2fec65613ac6c5e4"
+        }
+      ]
+    },
+    {
+      "id": "claim_7f27808e04a54852bbc60b0a498be61b",
+      "statement": "ExtractivePipeline._to_report builds a new IncidentReport by copying the accumulated ReasoningState fields (symptom, affected_resource, anchor fields, affected_pods, hypotheses, blast_radius, upstream_unhealthy, evidence, suggested_next_steps, service_area), stamps reasoning_mode='extractive', and returns report.ranked(); the ReasoningState is not returned.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/extractive.py#L87-L107",
+          "version": "repo-lines-v1:sha256:9ab483b2685bc6821eac7d444d4eebe1fac66403c67068c86d637deb02a0574d:eyJzZWxlY3RlZExpbmVDb3VudCI6MjEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk3NjMyMWNjZTVhMTc2NjczYTZhZjhkMjU3YjU4YzZmODc4NTk4MjZmODM3NDdiMTM3NjhhNGU3NjlkYmJmNDMiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImMzYTgyMmRhZDg1NjRjNTUwY2U4MDJmMzg3NDgyMzRlYTgwNDZiZjljOWFlNjVjNTVhYzI2MWI5MTk4ZTU2ZWIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM5ZGE0ZDdiYmQzYmU4ZDM5OTViMTI1OTkxNTgwMDI1OTcxM2M0OWFiMTRmZmQ2N2I4MWE3MDVjOTgzMjVhNzAiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjowLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImUzYjBjNDQyOThmYzFjMTQ5YWZiZjRjODk5NmZiOTI0MjdhZTQxZTQ2NDliOTM0Y2E0OTU5OTFiNzg1MmI4NTUifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_e5d97535a69a443ab27477d1c28b1c71",
+      "statement": "The webhook handler filters to firing alerts, runs ReasoningFlow.run per alert, and records each resulting IncidentReport via record_external_incident, while auto-detected faults are stored through the event watcher's _store path, so both land in the shared EventWatcher.incidents pool.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/detection/event_watcher.py",
+          "version": "repo-file-v1:sha256:86da39807db947fbb8fc2816ea421ec9330607ad875301ae41a5f078ab75b3e5"
+        },
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py#L355-L363",
+          "version": "repo-lines-v1:sha256:d30cb54417d293e344261f7896393f68b73ead7166a81a62fae52ceb5cb37718:eyJzZWxlY3RlZExpbmVDb3VudCI6OSwiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiY2M0MGJmYTA2NjgyYzI4NmY4ZTljNTE3ZmVlY2JlMjcyZDM0YmY2ZDliYmZkZDEwYTRmYTEyNzRiNjQwZTE3YSIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYjdhMTMwOGEyNGVhZmRiYWU5NWYxYzU0ZGVmOGI2MjUwNWIzM2VmZTVhYzZkYjNiN2Q0MDJiYmM1YzExZWY2YSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiMGJlZjIzMmNiZmEwMjBiZDA0N2M1YzM0YTMyNGFkZjQ5MTdjYjgyNzVlM2NiNWZhYmVhMzI5YWE3ZTRkNGRiYSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiZjQwYjRiMmJiZjg1MDY4NTE1MDg5MzdmNjMwM2JjNzVhMmVlYjJhOGRhN2EyNTU4NTM3NmY4NWM0OWQzNzFhNyJ9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T20:42:17.288Z"
+  }
+}

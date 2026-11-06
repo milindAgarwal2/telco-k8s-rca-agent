@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:200e2989aa7628aee957eaed9739676faf5d2a7eb576cedbea2f8f9aa513b496",
+  "claims": [
+    {
+      "id": "claim_6be37fbba065492b9a15d09672e918ed",
+      "statement": "POST /webhook/alertmanager keeps only firing alerts, runs each through ReasoningFlow.run, and records each report via record_external_incident, with the Alert.target derived from labels in priority order pod, deployment, statefulset, service, job, instance.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/models/alert.py",
+          "version": "repo-file-v1:sha256:1f0f703a416f414d5d13bf9346f8fc7725dfb2e435ed55bfa5af0ef927eb5f20"
+        },
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py",
+          "version": "repo-file-v1:sha256:27dff6f5e665637eb6e3509f7d5ed4b12c87982c6c2d1ff9f4534f8b7fb07252"
+        }
+      ]
+    },
+    {
+      "id": "claim_a967d1f605af4b0ba620a45210524b39",
+      "statement": "A webhook test verifies that posting the sample Alertmanager payload returns a report with a symptom, ranked hypotheses, and suggested next steps, and that a manually posted incident appears in the incidents list.",
+      "evidence": [
+        {
+          "resource": "repo://tests/test_webhook.py",
+          "version": "repo-file-v1:sha256:8a85c978478c0acb974cdd4b9ffd8946d8e0322da7429d7a7094f536681ece3d"
+        }
+      ]
+    },
+    {
+      "id": "claim_e522d626df034950a3a275fd313aac0c",
+      "statement": "The event watcher acts only on the named fault reasons in KubeEvent.FAULT_REASONS (CrashLoopBackOff, OOMKilled, ImagePullBackOff, ErrImagePull, FailedScheduling, Unhealthy, FailedMount, NodeNotReady, Evicted), scopes to events whose object is already a graph node, deduplicates by event UID, and drops events older than event_max_age_minutes.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/detection/event_watcher.py",
+          "version": "repo-file-v1:sha256:86da39807db947fbb8fc2816ea421ec9330607ad875301ae41a5f078ab75b3e5"
+        },
+        {
+          "resource": "repo://src/rca_agent/models/alert.py",
+          "version": "repo-file-v1:sha256:1f0f703a416f414d5d13bf9346f8fc7725dfb2e435ed55bfa5af0ef927eb5f20"
+        }
+      ]
+    },
+    {
+      "id": "claim_2bc1dbc430d94bfaadba7d99ffcf1389",
+      "statement": "Status-based detection raises an incident for a pod that stays unhealthy across status_unhealthy_rebuilds consecutive graph rebuilds even with no fresh event, and setting the value to 0 disables it.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        }
+      ]
+    },
+    {
+      "id": "claim_10c1d6e60800489a8651eb65794b4b4d",
+      "statement": "The GET /debug/detection endpoint exposes the watcher's last-poll gate counters (events_seen, events_403, matched_fault_reason, dropped_stale, out_of_scope, already_seen, event_incidents, status_incidents, unhealthy_pods) so that 'no incidents' is self-diagnosing.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py",
+          "version": "repo-file-v1:sha256:27dff6f5e665637eb6e3509f7d5ed4b12c87982c6c2d1ff9f4534f8b7fb07252"
+        }
+      ]
+    },
+    {
+      "id": "claim_e5ae6c4060f34cbd96a29c29d69eb5f2",
+      "statement": "Tests verify the event watcher behavior and the webhook path, including that auto-detected and manually posted incidents share one incident timeline.",
+      "evidence": [
+        {
+          "resource": "repo://tests/test_event_watcher.py",
+          "version": "repo-file-v1:sha256:db3a05dd73d19f255f12511ebce3f6df9916938041ae5fa72b7ac17b50551f5c"
+        },
+        {
+          "resource": "repo://tests/test_webhook.py",
+          "version": "repo-file-v1:sha256:8a85c978478c0acb974cdd4b9ffd8946d8e0322da7429d7a7094f536681ece3d"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T19:34:26.963Z"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "subscription_id": "00000000-0000-0000-0000-000000000000",
+  "tenant_id": "00000000-0000-0000-0000-000000000000",
+  "resource_group": "example-resource-group",
+  "location": "example-region",
+  "foundry_resource": "example-ai-services-account",
+  "container_registry": "examplecontainerregistry",
+  "monitoring": {
+    "activity_log_hours": 1,
+    "max_events": 50,
+    "metric_interval": "PT5M",
+    "metric_window_hours": 1
+  }
+}

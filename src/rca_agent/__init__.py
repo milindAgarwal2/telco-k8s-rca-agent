@@ -5,4 +5,4 @@ gathers evidence, reasons over a live NetworkX dependency graph, and emits an
 incident report with ranked root-cause hypotheses. It never mutates the cluster.
 """
 
-__version__ = "0.10.1"
+__version__ = "0.12.0"

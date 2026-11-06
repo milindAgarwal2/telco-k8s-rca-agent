@@ -1,0 +1,72 @@
+{
+  "policy_version": "1.3-scas",
+  "scanner": {
+    "exclude_directories": [
+      ".git",
+      ".aide",
+      ".framework-governance",
+      ".venv",
+      "venv",
+      "node_modules",
+      "dist",
+      "build",
+      "target",
+      ".idea",
+      ".vscode",
+      "__pycache__"
+    ],
+    "source_evidence": true,
+    "max_source_files": 5000
+  },
+  "catalog": {
+    "mode": "scas",
+    "base_url": "https://scas.internal.ericsson.com/ordering",
+    "search_path": "/components/search",
+    "refresh_url": "https://scas.internal.ericsson.com/registry/auth/token/refresh",
+    "refresh_token_env": "SCAS_REFRESH_TOKEN",
+    "size": 500,
+    "name_operator": "likei",
+    "name_match": "contains",
+    "version_operator": "NTXEQ",
+    "version_fallback": true,
+    "maven_coordinate_fallback": true,
+    "timeout_seconds": 30,
+    "verify_tls": true
+  },
+  "job": {
+    "heartbeat_interval_seconds": 5,
+    "stale_after_seconds": 120,
+    "estimated_seconds_per_item": 2.0,
+    "estimated_report_overhead_seconds": 5.0,
+    "projection_list_limit": 100
+  },
+  "policy": {
+    "approved_statuses": [
+      "approved",
+      "available",
+      "active",
+      "completed",
+      "released",
+      "accepted",
+      "green"
+    ],
+    "warning_statuses": ["conditional", "amber", "maintenance"],
+    "review_statuses": ["review", "yellow", "unknown"],
+    "denied_statuses": [
+      "denied",
+      "prohibited",
+      "unavailable",
+      "deprecated",
+      "eol",
+      "rejected",
+      "red"
+    ],
+    "unknown_component_status": "red",
+    "unknown_version_status": "yellow",
+    "catalog_error_status": "grey",
+    "whitelisted_component_patterns": [
+      "docker.artifactory.rosetta*",
+      "docker.artifactory.rosetta.ericssondevops.com/*"
+    ]
+  }
+}

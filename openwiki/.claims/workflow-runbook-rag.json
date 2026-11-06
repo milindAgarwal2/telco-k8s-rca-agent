@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:c7ae20d2c645abae0beebe959bbe1ad046af3f4e59ff302628214340c2d0d720",
+  "claims": [
+    {
+      "id": "claim_db1a4008b2174b79866e4c3ac431e817",
+      "statement": "Runbook retrieval (RAG) supplies the incident report's suggested next steps, and the agent only reads runbooks and surfaces them for a human, never acting on them.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/rag/runbook_retriever.py",
+          "version": "repo-file-v1:sha256:67f2c093b2a45f678cb3d752eaf3200c6ee5d14c4ce51b4f4084789fc958a93c"
+        }
+      ]
+    },
+    {
+      "id": "claim_8c71689dbb1846e6ae0188dfb0184977",
+      "statement": "The retriever has two additive sources: the built LocalRunbookRetriever (TF-IDF keyword scoring over uploaded documents, fully local with no network or LLM) and the unbuilt HttpRunbookRetriever placeholder for an external doc-intelligence service.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/rag/runbook_retriever.py",
+          "version": "repo-file-v1:sha256:67f2c093b2a45f678cb3d752eaf3200c6ee5d14c4ce51b4f4084789fc958a93c"
+        }
+      ]
+    },
+    {
+      "id": "claim_e2d8e9e710344e76bad1e3f3558afcbb",
+      "statement": "Documents are uploaded via POST /runbooks and stored as plain JSON on local disk with no database or vector store, chunked into paragraphs for scoring, with a re-uploaded filename replacing its chunks rather than duplicating them.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/rag/local_store.py",
+          "version": "repo-file-v1:sha256:5bde712389c47e3293eecef353f4c28bad5530c66882eb94bbdcbab71f435c58"
+        },
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py",
+          "version": "repo-file-v1:sha256:27dff6f5e665637eb6e3509f7d5ed4b12c87982c6c2d1ff9f4534f8b7fb07252"
+        }
+      ]
+    },
+    {
+      "id": "claim_5d8a4ae8ccb2463bba56a6c9f98ac498",
+      "statement": "The query log records every runbook-retrieval attempt in a thread-safe, in-memory, bounded deque, and a zero-hit (negative) entry is the signal to write a runbook for that situation.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/rag/query_log.py",
+          "version": "repo-file-v1:sha256:e69ed394bc4a2657b0720acecd9fc05bba38d5452b81890e1c0c7bbd61aebcdb"
+        }
+      ]
+    },
+    {
+      "id": "claim_196072c7971a44a9a68335e04348878f",
+      "statement": "The opt-in semantic retriever (fastembed bge-small ONNX plus in-memory ChromaDB) is used only when runbook_rag_semantic is True, the rag-semantic dependencies import, and the LLM sidecar is opted in and reachable; otherwise it transparently falls back to the extractive TF-IDF retriever and the index is rebuilt from the local store on startup.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        },
+        {
+          "resource": "repo://src/rca_agent/rag/semantic_store.py",
+          "version": "repo-file-v1:sha256:71d64a717716fa654773689e7e48690909ae8fad0264eaec36523bc7c050d739"
+        }
+      ]
+    },
+    {
+      "id": "claim_9249c480e1494ab0a0170afe26042f5e",
+      "statement": "Tests verify the local TF-IDF retrieval path and the opt-in semantic path including its gating and fallback behavior.",
+      "evidence": [
+        {
+          "resource": "repo://tests/test_runbook_rag.py",
+          "version": "repo-file-v1:sha256:a1d318b48c52a1feeba7e7d2092ded2a82d1dfd14ffbb7ac9714da36f21fb784"
+        },
+        {
+          "resource": "repo://tests/test_semantic_rag.py",
+          "version": "repo-file-v1:sha256:9058ae97c12c0fef25127a7a1a3e167a853a1242ac93f6a4d80d6a95d081c36f"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T19:34:26.963Z"
+  }
+}

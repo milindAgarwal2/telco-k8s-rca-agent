@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:bc0ccecf2e2b2bf173a15a616e1880a5a44f6851df78a0e8e5316edbf1aa314c",
+  "claims": [
+    {
+      "id": "claim_91819a6561874be1a2121b5492f467a8",
+      "statement": "The project does not build authoritative NF-to-NF topology edges because no authoritative static service map exists and OTel tracing is not stood up; instead the event watcher's _correlate links incidents with an identical failure signature on a different resource and never claims or ranks a specific shared cause.",
+      "evidence": [
+        {
+          "resource": "repo://PLAN.md",
+          "version": "repo-file-v1:sha256:d3b5811e125e64da9bca1bfa29b773328e481c8608593299bc88843d356f0c3a"
+        },
+        {
+          "resource": "repo://src/rca_agent/detection/event_watcher.py",
+          "version": "repo-file-v1:sha256:86da39807db947fbb8fc2816ea421ec9330607ad875301ae41a5f078ab75b3e5"
+        }
+      ]
+    },
+    {
+      "id": "claim_a1bb93ce23bb4cd68825b0ca3735b3f8",
+      "statement": "calls edges are built only from literal env var or ConfigMap references to another Service name, so when a dependency is referenced only via a Secret, a hardcoded address, or service discovery, no edge is built, which PLAN.md describes as an honest outcome rather than a bug.",
+      "evidence": [
+        {
+          "resource": "repo://PLAN.md",
+          "version": "repo-file-v1:sha256:d3b5811e125e64da9bca1bfa29b773328e481c8608593299bc88843d356f0c3a"
+        },
+        {
+          "resource": "repo://src/rca_agent/graph/builder.py",
+          "version": "repo-file-v1:sha256:04c9f826ccef3c75ecfde12ce04235fea1b98aa0ff2ce5fccbe0ee191cb07b8e"
+        }
+      ]
+    },
+    {
+      "id": "claim_9092246c65584177813a829f68e8fb1c",
+      "statement": "The HttpRunbookRetriever for an external doc-intelligence service is unbuilt and setting runbook_rag_url alone does nothing yet; only the LocalRunbookRetriever is functional.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        },
+        {
+          "resource": "repo://src/rca_agent/rag/runbook_retriever.py",
+          "version": "repo-file-v1:sha256:67f2c093b2a45f678cb3d752eaf3200c6ee5d14c4ce51b4f4084789fc958a93c"
+        }
+      ]
+    },
+    {
+      "id": "claim_998255f27ea14b4b9fa8ba44412c6175",
+      "statement": "PLAN.md marks several environment prerequisites as to-build, including the kind/k3d Open5GS cluster, the observability stack (kube-prometheus-stack, Loki, OpenTelemetry/Jaeger), and Alertmanager rules.",
+      "evidence": [
+        {
+          "resource": "repo://PLAN.md",
+          "version": "repo-file-v1:sha256:d3b5811e125e64da9bca1bfa29b773328e481c8608593299bc88843d356f0c3a"
+        }
+      ]
+    },
+    {
+      "id": "claim_8df827c8594e4df5ae39f46fb791fded",
+      "statement": "Deployment-specific details such as the GGUF model file location, the jumpserver host, and the deploy-cobra.sh operational flow come from narrative documentation and cannot be verified from repository source.",
+      "evidence": [
+        {
+          "resource": "repo://docker/SIDECAR.md",
+          "version": "repo-file-v1:sha256:15f21373f120130ce5b31aec5dfd0bda2a44034fbea5921ca143d423a1962b96"
+        }
+      ]
+    },
+    {
+      "id": "claim_57a01cabe97c44b1beba05b6525d6a2d",
+      "statement": "Because the default settings disable both the cluster and the LLM, a freshly cloned repository most likely exercises only the demo graph and extractive path until an operator opts in (labelled inference).",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e7a91795522d442d9fb80001ffa04029",
+      "statement": "ReasoningFlow is a plain class that runs the extractive pipeline and an optional HTTP rerank with no LangGraph graph object in the read source, while the reasoning state and steps docstrings and the [llm] extra still reference LangGraph, which is a documentation gap for SME confirmation rather than a defect.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/flow.py",
+          "version": "repo-file-v1:sha256:dbbde1d52c7a93901c1d8f356fb61782b9d8607338147fd8bff61af9d972d8d7"
+        },
+        {
+          "resource": "repo://src/rca_agent/reasoning/state.py",
+          "version": "repo-file-v1:sha256:0e1484ac59af907995a64a57f563d38bc834f2b10390d3a63817921ee0806f98"
+        },
+        {
+          "resource": "repo://src/rca_agent/reasoning/steps.py",
+          "version": "repo-file-v1:sha256:94b8ac06a5c818740acc790796d58fc23d995fbbdf2cad4f2fec65613ac6c5e4"
+        }
+      ]
+    },
+    {
+      "id": "claim_8c80b0356e9f4698b6419c3a1d127c1d",
+      "statement": "detection/event_watcher.py defines _signature twice, and the second anchor/pod-aware definition shadows the first at import time so the first is dead code, pending detection-owner confirmation of the intended version.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/detection/event_watcher.py",
+          "version": "repo-file-v1:sha256:86da39807db947fbb8fc2816ea421ec9330607ad875301ae41a5f078ab75b3e5"
+        }
+      ]
+    },
+    {
+      "id": "claim_c877f4e6ac8a4ba1bd4ce9518b35b1e7",
+      "statement": "Whether EventWatcher's shared incidents list and streak/latch dicts, mutated from the event-watch thread and read from request handlers, require an explicit lock is an unresolved review question for the detection owner.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/detection/event_watcher.py",
+          "version": "repo-file-v1:sha256:86da39807db947fbb8fc2816ea421ec9330607ad875301ae41a5f078ab75b3e5"
+        }
+      ]
+    },
+    {
+      "id": "claim_b89ce760cc514531af06f4391596343a",
+      "statement": "The Python package version 0.10.1 disagrees with the Helm chart version and appVersion 0.1.0 and the default container image tag 0.3.9, so the intended release image and chart version are an unresolved release/deployment review item.",
+      "evidence": [
+        {
+          "resource": "repo://deploy/helm/Chart.yaml",
+          "version": "repo-file-v1:sha256:c6e929b09cd99623aa38e2af5e23ff7c04b95e91ce8b285273652a33fdf1a3df"
+        },
+        {
+          "resource": "repo://deploy/helm/values.yaml#L1-L3",
+          "version": "repo-lines-v1:sha256:74a67ee8b065928a43426a4a2397ca269c2adebb348adf23752148abbb9c0c31:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMzhjM2Y2OWE5OTg0MzM3NmNjNjdhNDZkNGRlMzA0NDlkZDNiZDM3NDI1NzQ0ZWI0ZGVhNWU1ODQ4MjJjZTA1OCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiYThjNjZkMzMzZDE3YmNiYmMwZmY0NjYyZjQ1MTU2ZGNhYzI5MTk2ZDU4ODYyZGQ0NGEwZGFmZDUxYmFlYjU3NSIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjAsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiZTNiMGM0NDI5OGZjMWMxNDlhZmJmNGM4OTk2ZmI5MjQyN2FlNDFlNDY0OWI5MzRjYTQ5NTk5MWI3ODUyYjg1NSIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNmQ3ZTEwNmJkODZlOThkZDQ1ZjBhMjhiOWJlZGQ4MzNmMzgyYmU1MGU3NmY5ZDJjZTM1NWQ3YWY3YjI3ODlkNyJ9"
+        },
+        {
+          "resource": "repo://src/rca_agent/__init__.py",
+          "version": "repo-file-v1:sha256:4d7315879b04730cf0c83f9b73166a745439b37eba1e0a2655e9e169d03c6ff5"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T20:42:17.288Z"
+  }
+}

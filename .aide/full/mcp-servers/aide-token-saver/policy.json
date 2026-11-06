@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "enabled": true,
+  "mode": "auto_safe",
+  "allowed_log_roots": [
+    "logs",
+    "reports"
+  ],
+  "allowed_log_extensions": [
+    ".log",
+    ".txt",
+    ".json",
+    ".jsonl"
+  ],
+  "deny_globs": [
+    "**/.env*",
+    "**/*.pem",
+    "**/*.key",
+    "**/secrets/**",
+    "**/.git/**"
+  ],
+  "max_file_bytes": 33554432,
+  "max_line_count": 2000,
+  "max_output_bytes": 32768,
+  "max_hook_input_bytes": 1048576,
+  "memory_cache_bytes": 8388608,
+  "cache_ttl_seconds": 600,
+  "retention_days": 90,
+  "max_events": 100000,
+  "allowed_tool_labels": [
+    "ctx_read",
+    "ctx_search",
+    "ctx_glob",
+    "ctx_tree",
+    "ctx_shell",
+    "read",
+    "fs_read",
+    "grep",
+    "glob",
+    "aide_log_view",
+    "aide_log_recover",
+    "aide_token_stats",
+    "aide_token_report",
+    "aide_kiro_metrics"
+  ]
+}

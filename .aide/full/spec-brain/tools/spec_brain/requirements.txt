@@ -1,0 +1,8 @@
+# Runtime dependencies for the repository-local specification brain.
+azure-identity>=1.25,<2
+graphiti-core==0.29.3
+# Graphiti imports this module directly; the current core wheel does not
+# declare it independently when used with newer compatible-model SDK releases.
+httpx>=0.28,<1
+mcp==2.1.1
+neo4j>=5.26,<7

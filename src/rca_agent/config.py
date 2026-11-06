@@ -27,6 +27,20 @@ class Settings(BaseSettings):
     port: int = 8080
     log_level: str = "INFO"
 
+    # --- Persistence (PostgreSQL datastore) ---
+    # Connection string for the agent's durable datastore (incidents + runbook
+    # query log). Env: RCA_DATABASE_URL (sourced from a Secret in deployment).
+    # Optional at the Settings level so the model loads without it; the
+    # mandatory-DB fail-fast at startup is enforced later in the store layer.
+    database_url: str | None = None
+    # Startup connect backoff budget for the datastore (Req 5.1): bounds how
+    # long _startup_store retries an unreachable DB before continuing non-fatal
+    # (/readyz stays not-ready). Production-friendly defaults; tests set these
+    # small so app-boot does not burn the backoff against an unreachable DB.
+    db_connect_attempts: int = 10          # env RCA_DB_CONNECT_ATTEMPTS
+    db_connect_max_delay: float = 10.0     # env RCA_DB_CONNECT_MAX_DELAY
+    db_connect_timeout: float = 10.0       # env RCA_DB_CONNECT_TIMEOUT (per-attempt pool-open cap)
+
     # --- Reasoning mode ---
     # "extractive" = deterministic, no LLM (default; reproducible & cheap).
     # "llm"        = LLM ranks/explains the rule-gathered evidence.
@@ -144,6 +158,13 @@ class Settings(BaseSettings):
     # service area the affected pod belongs to + factual redundancy counts.
     # Unset/missing -> feature inert (no service_area attached). Read-only.
     service_area_map_path: str | None = None
+
+    # --- Potential alarms (scoped) ---
+    # Path to the curated pod->alarm mapping workbook (xlsx). When set AND the file
+    # exists, incidents gain a `potential_alarms` field listing candidate alarms
+    # that could have been raised for the affected pod. Unset/missing -> feature
+    # inert (no potential_alarms attached). Read-only.
+    pod_alarm_map_path: str | None = None   # env RCA_POD_ALARM_MAP_PATH
 
     # --- Runbook query log ---
     # Records every runbook-retrieval attempt (not LLM calls -- this project

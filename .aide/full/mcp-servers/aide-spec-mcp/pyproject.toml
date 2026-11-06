@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aide-spec-mcp"
+version = "0.1.0"
+description = "Read-only evidence and validation MCP for Kiro specifications"
+readme = "README.md"
+requires-python = ">=3.10,<3.15"
+dependencies = [
+  "aide-architecture-mcp",
+  "aide-knowledge-mcp",
+  "mcp==2.1.1",
+]
+
+[project.scripts]
+aide-spec-mcp = "aide_spec_mcp.server:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.3,<9",
+  "ruff>=0.12,<1",
+]
+
+[tool.uv.sources]
+aide-architecture-mcp = { path = "../aide-architecture-mcp", editable = true }
+aide-knowledge-mcp = { path = "../aide-knowledge-mcp", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aide_spec_mcp"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"

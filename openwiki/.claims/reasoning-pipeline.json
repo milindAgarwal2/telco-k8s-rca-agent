@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:d636e0318c0a5daef40353a0600592ec0da16dd78f9c633ea823a46bb42903e7",
+  "claims": [
+    {
+      "id": "claim_cc27b0ad1e9f42beb67d8027619dc402",
+      "statement": "The default extractive pipeline runs deterministic steps in order: triage, gather_evidence, graph_walk, change_correlation, hypothesize_and_rank, build_next_steps, and a final build_service_area step, assembling an IncidentReport.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/extractive.py",
+          "version": "repo-file-v1:sha256:5d1291b8a56525cd4fcc29e9bc76d4dac2bb21db082f9f7a08c8e9c2606d6d6f"
+        },
+        {
+          "resource": "repo://src/rca_agent/reasoning/steps.py",
+          "version": "repo-file-v1:sha256:94b8ac06a5c818740acc790796d58fc23d995fbbdf2cad4f2fec65613ac6c5e4"
+        }
+      ]
+    },
+    {
+      "id": "claim_b88057d53c72418e883151cbf20184d5",
+      "statement": "The runbook retriever and service-area index are resolved fresh per incident so a runbook or mapping uploaded after startup takes effect on the next incident.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/extractive.py",
+          "version": "repo-file-v1:sha256:5d1291b8a56525cd4fcc29e9bc76d4dac2bb21db082f9f7a08c8e9c2606d6d6f"
+        }
+      ]
+    },
+    {
+      "id": "claim_7f81fb9aa3e34c35abf6c517ad03e962",
+      "statement": "Untrusted log and alert text is fenced as data in explicit delimiters before it is shown to any model, and the LLM is instructed not to follow instructions found inside the evidence text.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/llm_rerank.py",
+          "version": "repo-file-v1:sha256:ef78a147531192fcc6df33fcd21e927d2ab157cd5681bf6cc40be20c797c7ad3"
+        },
+        {
+          "resource": "repo://src/rca_agent/reasoning/steps.py",
+          "version": "repo-file-v1:sha256:94b8ac06a5c818740acc790796d58fc23d995fbbdf2cad4f2fec65613ac6c5e4"
+        }
+      ]
+    },
+    {
+      "id": "claim_1b09cd90e22e48f0802681b41d6e9735",
+      "statement": "When reasoning_mode is llm, the LLM may only reorder existing hypotheses by stable index and write a one-line explanation; unknown/duplicate/missing indices are rejected, it cannot add or remove a cause, and any error or unavailable sidecar returns the report unchanged in extractive order.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/flow.py",
+          "version": "repo-file-v1:sha256:dbbde1d52c7a93901c1d8f356fb61782b9d8607338147fd8bff61af9d972d8d7"
+        },
+        {
+          "resource": "repo://src/rca_agent/reasoning/llm_rerank.py",
+          "version": "repo-file-v1:sha256:ef78a147531192fcc6df33fcd21e927d2ab157cd5681bf6cc40be20c797c7ad3"
+        }
+      ]
+    },
+    {
+      "id": "claim_9fbf9a6402f04e899180f57047bde99c",
+      "statement": "The LLM runs as a local llama.cpp sidecar serving a GGUF model over a loopback OpenAI-compatible API that makes zero outbound calls and is bound to 127.0.0.1.",
+      "evidence": [
+        {
+          "resource": "repo://docker/SIDECAR.md",
+          "version": "repo-file-v1:sha256:15f21373f120130ce5b31aec5dfd0bda2a44034fbea5921ca143d423a1962b96"
+        },
+        {
+          "resource": "repo://src/rca_agent/reasoning/llm_rerank.py",
+          "version": "repo-file-v1:sha256:ef78a147531192fcc6df33fcd21e927d2ab157cd5681bf6cc40be20c797c7ad3"
+        }
+      ]
+    },
+    {
+      "id": "claim_613f7d0272404ac5a1a7c8890436820d",
+      "statement": "Reasoning tests exercise the extractive pipeline against the demo graph, asserting that a UPF OOMKilled event with a ConfigMap change outranks other candidates and verifying the demo graph edges and health roll-up.",
+      "evidence": [
+        {
+          "resource": "repo://tests/test_reasoning.py",
+          "version": "repo-file-v1:sha256:76e6d565b4c5e8bf5dd12f926b77202d07f1be153e6569c1ca59d7b7897ece22"
+        }
+      ]
+    },
+    {
+      "id": "claim_db089b0225174eabbad43a785bd3fe16",
+      "statement": "hypothesize_and_rank scores candidates with fixed additive weights: +0.45 for a fault event (OOMKilled/CrashLoopBackOff/ImagePullBackOff/ErrImagePull/Evicted), +0.50 for a readiness/liveness probe failure, +0.30 for a recent change the pod consumes versus +0.05 for an uncorrelated change, +0.20 for an unhealthy upstream cascade, and +0.15 for error/fatal log lines applied to every candidate, with each confidence clamped to 0.99.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/steps.py",
+          "version": "repo-file-v1:sha256:94b8ac06a5c818740acc790796d58fc23d995fbbdf2cad4f2fec65613ac6c5e4"
+        }
+      ]
+    },
+    {
+      "id": "claim_a74efcca57ac4d59b50a0a0f982f7b23",
+      "statement": "_link_change_to_fault chains a correlated change (one the affected pod mounts) and a fault on that pod into a single causal hypothesis and adds a +0.10 bonus, while an uncorrelated change is never chained into the fault.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/steps.py",
+          "version": "repo-file-v1:sha256:94b8ac06a5c818740acc790796d58fc23d995fbbdf2cad4f2fec65613ac6c5e4"
+        }
+      ]
+    },
+    {
+      "id": "claim_c2f1059742834967bf5ed32811f38089",
+      "statement": "Every hypothesis evidence chain is prefixed with 'symptom: <alertname> on <resource>' and a hypothesis is only created when tied to gathered evidence, so no cause is fabricated.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/steps.py",
+          "version": "repo-file-v1:sha256:94b8ac06a5c818740acc790796d58fc23d995fbbdf2cad4f2fec65613ac6c5e4"
+        },
+        {
+          "resource": "repo://tests/test_reasoning.py",
+          "version": "repo-file-v1:sha256:76e6d565b4c5e8bf5dd12f926b77202d07f1be153e6569c1ca59d7b7897ece22"
+        }
+      ]
+    },
+    {
+      "id": "claim_9a77136be0d94407bd82309dcb15c31a",
+      "statement": "The final build_service_area step attaches the affected pod's service area as scoped impact context only; it never creates a hypothesis or changes any hypothesis ranking and is a no-op when the feature is off or the pod is unmapped.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/reasoning/steps.py",
+          "version": "repo-file-v1:sha256:94b8ac06a5c818740acc790796d58fc23d995fbbdf2cad4f2fec65613ac6c5e4"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T20:42:17.288Z"
+  }
+}

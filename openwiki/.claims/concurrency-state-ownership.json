@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:e3d9cd005b7319f2a1466cbc497fc4aae8b4f4e6ff60f4d0bceaf1d1b7f28780",
+  "claims": [
+    {
+      "id": "claim_324833941c524854b5b048bd7c886d56",
+      "statement": "The FastAPI lifespan starts three asyncio background tasks - the initial graph build, the periodic refresh loop, and the event-watch loop - and cancels all three on shutdown.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py#L110-L145",
+          "version": "repo-lines-v1:sha256:3e83d8657d732a088270d0f4d9a4e45262e3963b649d0163b10eafe420896dad:eyJzZWxlY3RlZExpbmVDb3VudCI6MzYsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6Ijk4ZjJiZGFjYmZlN2JhYWZkYTJjZTJjOGNkYmQ3OWZjODA4ZDFmMDVlOTNkODY1MGFjZGFmMWQ4YmEwNjk2ZmQiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6ImJlZjA2YzZmMWRhMTRmYmY0ZmJiNzNlZTg1ZjNiNGMyNzVjMzA2NWNjNjI1ODdlMzZkMWYyYjM5MTkzNjY0MTUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjE3MGRmZWNiMzI0ZDlmYmE4NjgxMmYxZjk1YWVjMDYzOGU0YzMwNzcyM2IyNjljMzc4ZmE5ZmM2YWM5MWNiMGIiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImM3YjQ1NGNiZGJmM2VkYTVkODBhZDIyOGZiYTRiZGExODdhNjRjODQwNjIxMmMzMTQ1MTA1YTY2NjA1NGMzY2UifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_6580bfd0f5804b798594c68b1a4495a3",
+      "statement": "Each background task offloads its blocking Kubernetes work with asyncio.to_thread so the event loop stays responsive, which lets the initial cluster graph build run in a background thread without blocking /healthz.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py#L84-L124",
+          "version": "repo-lines-v1:sha256:46ec5b1531bddcdae8348ae6a02d36a80627ed8c7e9b224a3079d609f84f0ad7:eyJzZWxlY3RlZExpbmVDb3VudCI6NDEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYyM2Q2N2Y1ZWIwMjU0MTg1NGM5Mzg3ZWY0M2FlY2NjOTdiMTViMDVjMTVhOGI1OTgyNjJjMGZmMTc0MWVjZDYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRlMWZjMzliYmVhYzc5ZTRhNWQ5Y2U3YjdhZGViNjc5NjNhNzBjOTMyNTkxZDlhZjk1NmQwZjIwZGI1YWZlNTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImNhMDEzZGZlYjdhYjc3MGU2ZDFmODMwNGJjMWVlNDkyMTNhNzM2MzZhZGJjNzdmYjdlODI4M2ExZTgwYWMxZGIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_b67df61898924cbbad79e88202e8adcf",
+      "statement": "GraphBuilder.rebuild constructs a new DependencyGraph and assigns it to self._graph, and the refresh-loop docstring describes this as an atomic swap so read endpoints never observe a half-built graph (atomicity is an inference from the single-assignment pattern).",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/graph/builder.py#L61-L72",
+          "version": "repo-lines-v1:sha256:c3d1691ae82fdb10408ad28db2bc2721f8573909a758a9955a0a2f6327c9d0a2:eyJzZWxlY3RlZExpbmVDb3VudCI6MTIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjM4NjQxNmUwM2UyZTQxZTA5NDBmYjRlNjQ1ZjRmNzc1NmFhYzFiZTA1NGYzYzhmZGFkNTZlMDg0NDQwMmQyY2IiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYyYzA0YjY2MjRiN2YzMTBhMDJlYzdlMDM4ZDQ2N2IyMGUzNzc2Y2ZkMjNkZDZiMmMwYzM0OTZhYThiOGQwNjMiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6Ijg0MTVhY2Y2MDYxZGMwZDllODhkZDdkZGMwZTdiODdiYzAxM2IzOWYxMDE1ZWRhMThhOTViM2NjYjg5ZTg2MDQiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjA5NjdkNzYyY2UzNzk2ODU5Yzg3NzNlODU3NmY1N2NiZjI5MThiZTFiMjE2ZjlhNTc3OTJjMmU1NTY5NDhiNDkifQ"
+        },
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py#L84-L100",
+          "version": "repo-lines-v1:sha256:dc9985a875b6d4517256832ed08c41b19742fa407c7eeb1ee0fe44e5638a231d:eyJzZWxlY3RlZExpbmVDb3VudCI6MTcsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjYyM2Q2N2Y1ZWIwMjU0MTg1NGM5Mzg3ZWY0M2FlY2NjOTdiMTViMDVjMTVhOGI1OTgyNjJjMGZmMTc0MWVjZDYiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjhjNGE2M2U1MjA4ODE5M2JjMDM5NzJjZDE1NTExNDZiOTRiZjMwZWQ2YmNjOWU1MGQzMjIxMTFhOGIxNTA0ZjAiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImRlMWZjMzliYmVhYzc5ZTRhNWQ5Y2U3YjdhZGViNjc5NjNhNzBjOTMyNTkxZDlhZjk1NmQwZjIwZGI1YWZlNTEiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI0OWY1MWE3MjAxMjhlMzVmZGVjMjljOGMwOGM4NmUxYjg1YzMyZDk1ZjE1NTVkNzVkMzI1YTFmM2JhNjg4ZDAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_7f4f35f6e1fe49da8338037b0e4dbf3e",
+      "statement": "EventWatcher bounds its dedup and history stores with _MAX_SEEN_UIDS = 2000 (oldest UID evicted first) and _MAX_STORED_INCIDENTS = 200 (oldest incident trimmed from the front of the list).",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/detection/event_watcher.py#L45-L47",
+          "version": "repo-lines-v1:sha256:900169ef6fdbb4c20f29a8a7ac43c6b0eda64f60abe82d76c1a4121819478d78:eyJzZWxlY3RlZExpbmVDb3VudCI6MywiZmlyc3RTZWxlY3RlZExpbmVIYXNoIjoiMjM5YTRhYzA3N2MzYjcwZDQzM2JmNjRiNTdhNmY5ZTNhMjdkNDkwYTBlODg4NzRlOTVhNzQyOGZmMzY0ZmYyOCIsImxhc3RTZWxlY3RlZExpbmVIYXNoIjoiMzM0OGQ1MGQ2NmFjNjM2MGU5Y2E3YzIwNWRhYTg4NDBmOTRlY2ZkZmUyYWViNzA0OTZlNWQ3ZGI1NzkwYTZkMyIsInByZWNlZGluZ0NvbnRleHRMaW5lQ291bnQiOjMsInByZWNlZGluZ0NvbnRleHRIYXNoIjoiYzhmNWE3NjE3MWM2NDBhMjAyNzZhMGMzM2E2MjYxODZkNWNhNjY1YTNhNTc1ODJjNjMzOTJkNmQwNGZiNGVjNiIsImZvbGxvd2luZ0NvbnRleHRMaW5lQ291bnQiOjMsImZvbGxvd2luZ0NvbnRleHRIYXNoIjoiNGRmNzA0OGJhZWEzZmRkYjU0NjViMzhmOTk4ODJjYWZmZGM5MWFkNTk1OThlNzU5MTczZTBmNGQ4NDQxZWI3OSJ9"
+        }
+      ]
+    },
+    {
+      "id": "claim_ae684f6dacf74b13b6a7ee73e8b44b86",
+      "statement": "QueryLog holds its entries in a deque(maxlen=...) sized by runbook_query_log_max_entries and guards every read and write with a threading.Lock.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/rag/query_log.py#L34-L67",
+          "version": "repo-lines-v1:sha256:419cfe07f28a1aaff2291f7a32698c193cc2dfd31e45d7c0e00b62afd184aefb:eyJzZWxlY3RlZExpbmVDb3VudCI6MzQsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjE2ZTUzOTIwZmEwMGUyYThmZWVjY2U0MTEwZTA2NWVkZjkxYWE5OGVmNjM2YTZkYTlkNTg2NzYyNWQxNGVkZGQiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImM5ZDkyMmJkNmZmZjc0YTcxOGM2MTdiNTAwNTE5MTE4NjA4ZjlhMDg3ODcxYTRkZjhiMjlmYTAwNTI3ODA2MWUiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImJlODRjMzIwZjEyMTA3YmIyOWQzNzdmOGRjNjZhYTQ5NWEwYzI5OTMxNDY0ZjNiNTUzMjRjM2JiMTRkMmZkYWIifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_3259ecbb10b246d8b8759b88948c468e",
+      "statement": "LocalRunbookStore guards its mutations with a threading.Lock and persists atomically by writing a <path>.tmp file and then calling os.replace(tmp, self.path), which is atomic on the same filesystem.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/rag/local_store.py#L170-L201",
+          "version": "repo-lines-v1:sha256:8658f6e923fa63d02573135add20579afae807f0895834d698e85336f17bc26f:eyJzZWxlY3RlZExpbmVDb3VudCI6MzIsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImM3NmU3M2I1MTZjNzk2YWM2OTNlY2ZhZmNkMWIzZWM1MWFkN2UyNWJmOWQwMDEzMDc1NjQxZDJiOTEyZTBhZTgiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjMzYzZkODZmMGYxMDFmYzBjMzM2ODMzNjFiMDAwNjRlNjk5OGI5YmQzNWI0YzJmMDdhNjBhMDc1NjQ2NTU2M2IiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImYyM2ZiNjIwMzkzMDU1YjA3NDkwNjAxMmIyMDMwMzE2OTMzYzE4YmQwYTYyNTA0OWFjOTIzMjU3OTIwN2RhMmMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6ImI2MWYyOGY5ZTVjMDRlNzgwNTc3MWNjYTc0MWRiMWIwM2Q5NzUzOTVlYzA4MmQ1NDg5NDY3MWI5NzEyNzBkNDAifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_eca8a61a165449b6b75a6f192f26aa84",
+      "statement": "EventWatcher.incidents and its _unhealthy_streak and _status_incident_open dicts are mutated from the event-watch worker thread via poll_once and read from request handlers without an explicit lock, which is recorded as an unresolved review item rather than an asserted defect.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/detection/event_watcher.py#L90-L120",
+          "version": "repo-lines-v1:sha256:52b7696870dd2f702fbc029c91f277d81777aa8526c26abc474ba238731ac145:eyJzZWxlY3RlZExpbmVDb3VudCI6MzEsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6ImZjYWFiZWRjNTE1MmFmMTU3Zjk2YTA3ZDZjMDhkNDgxNGMyZjNlNTg5NDY5N2E0MWRmZjY0NzUwZDkxYjM0ZDEiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjlmYWIxOWUyYmNmYzU4OTVhNTE1YTY4ZDFlYWMzODU5YjMzY2U5NGQ1Yzc2NjNhZGQ0OTM4M2NhYmRhN2U3YWUiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6IjFmNjJhYzQ2ZGI4YTM4Y2M5Mzk5ZWY5Y2NlOWY4OTk0MjM1OTg4NmFmZjU0YzkzMmQ2MjAyYzEwYThkN2QwOGYiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjE2NjVkMDIyOWJiMTg1NWJlOTAzOWZlYmMyYjQ5NDc5YzVlNDMyMzllNmFhODhjOGE4MDhlYzRiNjU3YjZmNzUifQ"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T20:42:17.288Z"
+  }
+}

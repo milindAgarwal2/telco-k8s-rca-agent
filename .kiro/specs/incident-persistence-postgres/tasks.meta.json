@@ -1,0 +1,503 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. Add configuration and the core dependency": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764120297
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764129669
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764231100
+      }
+    ],
+    "2.1 Create `src/rca_agent/store/` with `db.py` defining `Database` (psycopg_pool `ConnectionPool`), `connect_with_retry` (bounded backoff), `is_ready()`, and `ensure_schema()`.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764120472
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764362380
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764463903
+      }
+    ],
+    "2.2 Add a test that `ensure_schema()` is idempotent (run twice, no error) against a disposable PostgreSQL (skip-if-no-DB marker).": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764120564
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764475834
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764758947
+      }
+    ],
+    "3.1 Implement `store/incident_store.py`: `upsert(report)` (INSERT ... ON CONFLICT (incident_id) DO UPDATE), `load_recent(limit)`, `get(incident_id)`, `count()`. Serialize with `IncidentReport.model_dump(mode=\"json\")` into the `payload` JSONB and mirror the typed columns.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764120660
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764770308
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793799648761
+      }
+    ],
+    "3.2 Write round-trip tests: `model -> upsert -> load/get -> model` equals the original for all fields incl. nested `hypotheses`, `evidence`, `citations`, `service_area`, `related_incidents`; and upsert of the same `incident_id` updates in place (no duplicate row).": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764120755
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793799654437
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793799754480
+      }
+    ],
+    "4.1 Implement `store/query_log_store.py`: `append(entry)`, `load_recent(limit)` (newest first), `clear()` (TRUNCATE), `stats()` (total/positive/negative via SQL counts). Store the full `QueryLogEntry` incl. `hit_titles` in `payload`.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764120849
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793799760755
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793806031416
+      }
+    ],
+    "4.2 Write tests: entry round-trip (incl. `hit_titles`), `stats()` matches in-memory stats, and `clear()` empties the table.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764121081
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793806036121
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793806765757
+      }
+    ],
+    "5.1 Add `get_store()` lru_cache singleton (mirroring `get_settings`/`get_query_log`) constructing `Database` + the two stores from `Settings`.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764121206
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793806773716
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793807465626
+      }
+    ],
+    "5.2 In `webhook/app.py` `_lifespan`, before `yield`: construct the store, `connect_with_retry`, `ensure_schema()`, then rehydrate `EventWatcher.incidents` and the `QueryLog` from `load_recent(...)`. Wrap blocking calls in `asyncio.to_thread`.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764121317
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793807471702
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793807654804
+      }
+    ],
+    "5.3 Make `/readyz` report not-ready until the DB connects; keep `/healthz` independent of the DB.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764121442
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793807659992
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793807824129
+      }
+    ],
+    "6.1 Inject the incident store into `EventWatcher`; call `upsert` from `_store`, and after each mutation in `reconcile_status`, `_merge_into_open_anchor`, and `_correlate`. Run the synchronous write via a thread when on the event loop (D5).": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764121579
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793807830396
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793808850474
+      }
+    ],
+    "6.2 Make each write non-fatal: on failure, log and keep the in-memory copy; do not raise into the poll loop or the request. Re-persist on the next mutation.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764121726
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793808856732
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793808868546
+      }
+    ],
+    "6.3 Persist webhook-posted incidents via `record_external_incident` (same store call).": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764121831
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793808873869
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793808879823
+      }
+    ],
+    "7.1 Inject the query-log store into `QueryLog`; call `append(entry)` inside `record(...)`, non-fatal on failure.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764121941
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793808885591
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809061021
+      }
+    ],
+    "7.2 Make `QueryLog.clear()` (and `DELETE /runbook-queries`) clear both memory and DB rows so a cleared log stays cleared across restarts.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764122146
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809066585
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809072441
+      }
+    ],
+    "8.1 Integration test (FastAPI `TestClient`): create incidents, flip one to inactive, then simulate a restart by constructing a fresh `EventWatcher` and rehydrating from the DB. Assert `/incidents?status=inactive` returns the previously-inactive incident (the exact production failure).": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764122243
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809080393
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809380404
+      }
+    ],
+    "8.2 Integration test: runbook query log survives the same simulated restart via `/runbook-queries`; and a durable `DELETE /runbook-queries` stays empty after rehydration.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764122411
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809385634
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809390153
+      }
+    ],
+    "8.3 Confirm `/incidents`, `/incidents/{id}`, and tab responses keep identical shapes whether freshly created or reloaded; add optional DB fallback for ids beyond the in-memory cache.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764122518
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809395062
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809560650
+      }
+    ],
+    "9. Failure-mode tests (non-fatal DB)": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764122627
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809566298
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809803837
+      }
+    ],
+    "10. Retention behavior": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764122747
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809808917
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793810685326
+      }
+    ],
+    "11.1 Add `deploy/helm/templates/postgres-statefulset.yaml` (single replica, `volumeClaimTemplates` PVC for the PG data dir) and `postgres-service.yaml` (ClusterIP `db-pg`, in-namespace only).": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764122857
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793810691391
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793810806820
+      }
+    ],
+    "11.2 Add `postgres-secret.yaml` (or reference an existing Secret) for PG credentials; inject `RCA_DATABASE_URL` into the agent Deployment from that Secret. Add a `postgres:` block and `agent.databaseUrlSecret` to `values.yaml`.": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764123032
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793810812629
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793810923925
+      }
+    ],
+    "11.3 Validate with `helm lint` and `helm template`; confirm the agent ClusterRole still grants only get/list/watch (DB is not a cluster write).": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764123133
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793810929792
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793812774256
+      }
+    ],
+    "12. Docker/Cobra: automate the PostgreSQL container (Req 1.4, D6)": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764123239
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793812780102
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793812929058
+      }
+    ],
+    "13. Security review of credentials and stored data": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764123338
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793812934320
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793812956459
+      }
+    ],
+    "14. Reconcile specs and run full verification": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764123436
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793812961833
+      },
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793813608437
+      }
+    ],
+    "2. Create the store package skeleton and schema": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793764759178
+      }
+    ],
+    "3. Implement the IncidentStore with round-trip tests": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793799754601
+      }
+    ],
+    "4. Implement the QueryLogStore with round-trip tests": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793806765915
+      }
+    ],
+    "5. Wire the store singleton and startup lifecycle": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793807824363
+      }
+    ],
+    "6. Persist incidents at the EventWatcher write points (write-through)": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793808880059
+      }
+    ],
+    "7. Persist the runbook query log at its write point": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809072611
+      }
+    ],
+    "8. Restart-survival and read-path integration tests": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793809561372
+      }
+    ],
+    "11. Helm: add the db-pg PostgreSQL pod (Req 1)": [
+      {
+        "executionId": "4e1b05d4-1d10-4c29-8a0b-5dcc1a2a6b79",
+        "chatSessionId": "sess_3295d5d8-4ea1-4547-bcd6-4272455d6e50",
+        "timestamp": 1793812774568
+      }
+    ]
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:8ec6b016bc60c05f9e71f0d0677292aa6abfa989f4bb37c42026ec8c990331e1",
+  "claims": [
+    {
+      "id": "claim_42558d4202034a8b9522b42b53ff9650",
+      "statement": "The system is a read-only agent that detects faults in a Kubernetes-hosted 5G core and explains their root cause without ever changing the cluster.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:05f39db16c1c646d63a7ca23d6b3cda34a5efcf07c206c44392c736608ee311d"
+        },
+        {
+          "resource": "repo://pyproject.toml",
+          "version": "repo-file-v1:sha256:9a6f9f208d0557c777fbc83dc2ad3b5453f758a963947f661ce380a28f11a5bb"
+        }
+      ]
+    },
+    {
+      "id": "claim_6c3467db57f741d08aa915b4f4366169",
+      "statement": "The pipeline follows four stages: detect, gather evidence, reason, and report.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:05f39db16c1c646d63a7ca23d6b3cda34a5efcf07c206c44392c736608ee311d"
+        }
+      ]
+    },
+    {
+      "id": "claim_0c47c94abd8542d98ca8e4092b4b4e78",
+      "statement": "The output is an incident report containing a symptom, ranked root-cause hypotheses with confidence and evidence chains, a blast radius of downstream services, runbook-derived suggested next steps for a human, and citations for every claim.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:05f39db16c1c646d63a7ca23d6b3cda34a5efcf07c206c44392c736608ee311d"
+        }
+      ]
+    },
+    {
+      "id": "claim_319a90748d124a828a2ac5d5e990206d",
+      "statement": "Safety is read-only by construction via three layers: RBAC granting only get/list/watch, query-only tools with no write tool, and untrusted log/alert input fenced as data against prompt injection.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:05f39db16c1c646d63a7ca23d6b3cda34a5efcf07c206c44392c736608ee311d"
+        }
+      ]
+    },
+    {
+      "id": "claim_3b25e1e6fac74fc8a98f078cd71353d4",
+      "statement": "Reasoning is rules-first, LLM-second: deterministic code finds candidate causes and the optional LLM only ranks and explains them, with the default extractive no-LLM mode still producing ranked candidates and the evidence table.",
+      "evidence": [
+        {
+          "resource": "repo://README.md",
+          "version": "repo-file-v1:sha256:05f39db16c1c646d63a7ca23d6b3cda34a5efcf07c206c44392c736608ee311d"
+        }
+      ]
+    },
+    {
+      "id": "claim_0603bd391e9740dc8e1bacc1d4e43a15",
+      "statement": "The whole service runs as one FastAPI process that also serves a server-rendered dashboard.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py",
+          "version": "repo-file-v1:sha256:27dff6f5e665637eb6e3509f7d5ed4b12c87982c6c2d1ff9f4534f8b7fb07252"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T19:34:26.963Z"
+  }
+}

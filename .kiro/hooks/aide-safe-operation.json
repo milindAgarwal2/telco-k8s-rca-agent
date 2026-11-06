@@ -1,0 +1,17 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-safe-operation",
+      "description": "Fail closed when an operational target is unknown or unauthorized.",
+      "trigger": "PreToolUse",
+      "matcher": "shell|execute_bash|powershell|@.*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-safe-operation"
+      },
+      "timeout": 20,
+      "enabled": true
+    }
+  ]
+}

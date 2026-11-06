@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:61e9de669729b5d7596d2f1082a5763699f2f1ee2328aae1663854c6b2abd7aa",
+  "claims": [
+    {
+      "id": "claim_09ded5bf50624f3292767f6534b66aa7",
+      "statement": "The read-only QueryTools interface defines pod_status, recent_events, logs, metrics, and recent_changes, has deliberately no write/patch/delete tool, and ships a StubQueryTools returning deterministic demo data so the pipeline runs with no cluster.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/tools/query_tools.py",
+          "version": "repo-file-v1:sha256:c484ecda5fda55e9801d7463211662bcc62e91ebac6140162706ead69aebc7d6"
+        }
+      ]
+    },
+    {
+      "id": "claim_11af87d3590a48828ddc7dbefa1648eb",
+      "statement": "The Kubernetes client supports kubeconfig_mode auto (in-cluster if a ServiceAccount token exists else kubeconfig), incluster, and local, is used read-only with only list_ and read_ calls, and imports the kubernetes dependency lazily from the [cluster] extra.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/tools/kube_client.py",
+          "version": "repo-file-v1:sha256:ab9974256c033859c3c11ed950ac7042300f78a0a5fd9d3240e4e77a3390b4cc"
+        }
+      ]
+    },
+    {
+      "id": "claim_31bc198486624dfb929d2800a468ec62",
+      "statement": "Prometheus metrics are optional via PromQL in the metrics tool, with prometheus_url unset by default and metrics skipped gracefully while pod status, events, logs, and changes still work.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        },
+        {
+          "resource": "repo://src/rca_agent/tools/query_tools.py",
+          "version": "repo-file-v1:sha256:c484ecda5fda55e9801d7463211662bcc62e91ebac6140162706ead69aebc7d6"
+        }
+      ]
+    },
+    {
+      "id": "claim_630de733fbc643e5acd14f6c102363da",
+      "statement": "The optional LLM sidecar is a local llama.cpp server serving a GGUF model, makes zero outbound calls, is bound to loopback 127.0.0.1, and any error or timeout falls back to the deterministic extractive order.",
+      "evidence": [
+        {
+          "resource": "repo://docker/SIDECAR.md",
+          "version": "repo-file-v1:sha256:15f21373f120130ce5b31aec5dfd0bda2a44034fbea5921ca143d423a1962b96"
+        }
+      ]
+    },
+    {
+      "id": "claim_e5ad320bfdd144f187a87e041308f83c",
+      "statement": "The service-area impact workbook loader reads the '20-section map' and 'Pod map' sheets, ignores the 'Alert mapping detail' sheet, matches pods on a hash-stripped stem, and produces additive impact context that is explicitly not a cause and never changes hypothesis ranking.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/impact/loader.py",
+          "version": "repo-file-v1:sha256:157a0fa4f833ae0043ec02a51e9c0fe1b4dd498cd1978da14ae0a7458f9c900c"
+        },
+        {
+          "resource": "repo://src/rca_agent/models/incident.py",
+          "version": "repo-file-v1:sha256:ed5cf5ccdb02996623fb03d30837a735036369d173014aede4eee600dad56cf7"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T19:34:26.963Z"
+  }
+}

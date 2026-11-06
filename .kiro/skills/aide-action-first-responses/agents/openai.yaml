@@ -1,0 +1,7 @@
+interface:
+  display_name: "AIDE Action First Responses"
+  short_description: "Action-first responses for clear execution"
+  default_prompt: "Use $aide-action-first-responses to make this response action-first and easy to execute."
+
+policy:
+  allow_implicit_invocation: false

@@ -38,6 +38,13 @@ spec:
               value: "{{ .Values.agent.logLevel }}"
             - name: RCA_RUNBOOK_RAG_URL
               value: "{{ .Values.agent.runbookRagUrl }}"
+            # Mandatory DB (D1): the agent reads its durable datastore URL from the
+            # PG credentials Secret, never from a committed plaintext value (Req 6.1).
+            - name: RCA_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.agent.databaseUrlSecret | default (printf "%s-db-pg" (include "rca-agent.fullname" .)) }}
+                  key: {{ .Values.agent.databaseUrlSecretKey | default "database-url" }}
           securityContext:
             allowPrivilegeEscalation: {{ .Values.securityContext.allowPrivilegeEscalation }}
             readOnlyRootFilesystem: {{ .Values.securityContext.readOnlyRootFilesystem }}

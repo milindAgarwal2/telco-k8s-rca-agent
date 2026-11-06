@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
+from rca_agent.alarms.models import PotentialAlarms
 from rca_agent.impact.models import ServiceAreaImpact
 
 
@@ -97,6 +98,13 @@ class IncidentReport(BaseModel):
     # IMPACT context (what area is affected), NOT a cause -- it never changes
     # hypothesis ranking.
     service_area: ServiceAreaImpact | None = None
+
+    # Scoped potential alarms: candidate alarms that COULD have been raised for
+    # the affected pod, from the curated pod-alarm workbook. None when the
+    # feature is off or the pod is unmapped. Additive and defaulted so existing
+    # reports/serialization are unaffected. This is CONTEXT (what could fire),
+    # NOT a cause -- it never changes hypothesis ranking.
+    potential_alarms: PotentialAlarms | None = None
 
     # Other incident_ids sharing this one's exact failure signature on a
     # DIFFERENT resource within the correlation window (see

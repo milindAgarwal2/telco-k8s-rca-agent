@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "name": "postgresql-inspection",
+  "purpose": "Optional schema and query investigation for projects that require PostgreSQL.",
+  "upstream": "project-selected PostgreSQL MCP implementation",
+  "version": "unresolved",
+  "license": "unresolved",
+  "integrity": {"kind": "unresolved", "value": null, "artifact_hash": null},
+  "verified_on": null,
+  "runtime": "project-selected",
+  "transport": "stdio",
+  "supported_os": ["project-selected"],
+  "capabilities": ["schema inspection", "reviewed read queries", "query-plan investigation"],
+  "setup_steps": ["Select, license-review, and pin one PostgreSQL MCP implementation", "Create or select a database role whose privileges enforce read-only access", "Provide its DSN through AIDE_POSTGRES_DSN locally"],
+  "health_check": "MCP initialize and tools/list; database reads are separate and require target confirmation",
+  "secret_refs": ["AIDE_POSTGRES_DSN"],
+  "requires_explicit_configuration": true,
+  "kiro_template": {"command": "postgres-mcp-command-must-be-configured", "args": [], "env": {"DATABASE_URL": "${AIDE_POSTGRES_DSN}"}},
+  "corrective_action": "Pin a reviewed server and use a database role whose privileges enforce read-only inspection.",
+  "permissions": "Schema/query inspection only; prompt instructions are not a database authorization boundary.",
+  "removal_owner": "AIDE-managed mcpServers.postgresql-inspection key only"
+}

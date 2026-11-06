@@ -1,0 +1,52 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-story-readiness-create",
+      "description": "Validate a newly created Jira story and queue specification authoring only when it is EARS-ready.",
+      "trigger": "PostFileCreate",
+      "matcher": "^jira[/\\\\][A-Z][A-Z0-9-]*-[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*\\.md$",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-story-ready"
+      },
+      "timeout": 20,
+      "enabled": true
+    },
+    {
+      "name": "aide-story-readiness-save",
+      "description": "Revalidate a saved Jira story and update its idempotent specification request.",
+      "trigger": "PostFileSave",
+      "matcher": "^jira[/\\\\][A-Z][A-Z0-9-]*-[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*\\.md$",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-story-ready"
+      },
+      "timeout": 20,
+      "enabled": true
+    },
+    {
+      "name": "aide-story-spec-create",
+      "description": "Draft a bounded Kiro specification after creation of an EARS-ready Jira story.",
+      "trigger": "PostFileCreate",
+      "matcher": "^jira[/\\\\][A-Z][A-Z0-9-]*-[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*\\.md$",
+      "action": {
+        "type": "agent",
+        "prompt": "Run `uv run --project .aide/full/hook --offline --frozen aide-hook aide-story-to-spec` and parse its JSON. If action is none, complete, or blocked, report that state and stop. For generate or repair, use only the returned story_path, spec_dir, and gaps. Follow the spec-brain skill first, then prompt/generate-kiro-specs-from-jira-story.md and the aide-spec-authoring skill. Create or repair requirements.md, design.md, and tasks.md only inside spec_dir. Do not implement. Rerun aide-story-to-spec after writing; repeat only while it returns repair. The command enforces a maximum of three attempts. Stop and present Gate A when it returns complete."
+      },
+      "enabled": true
+    },
+    {
+      "name": "aide-story-spec-save",
+      "description": "Draft a bounded Kiro specification after an imported Jira story becomes EARS-ready.",
+      "trigger": "PostFileSave",
+      "matcher": "^jira[/\\\\][A-Z][A-Z0-9-]*-[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*\\.md$",
+      "action": {
+        "type": "agent",
+        "prompt": "Run `uv run --project .aide/full/hook --offline --frozen aide-hook aide-story-to-spec` and parse its JSON. If action is none, complete, or blocked, report that state and stop. For generate or repair, use only the returned story_path, spec_dir, and gaps. Follow the spec-brain skill first, then prompt/generate-kiro-specs-from-jira-story.md and the aide-spec-authoring skill. Create or repair requirements.md, design.md, and tasks.md only inside spec_dir. Do not implement. Rerun aide-story-to-spec after writing; repeat only while it returns repair. The command enforces a maximum of three attempts. Stop and present Gate A when it returns complete."
+      },
+      "enabled": true
+    }
+  ]
+}
+

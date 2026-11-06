@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:928aec4e3427491e20a57193c3bb941c245f3705ad34e261f3bef02e919f7d2b",
+  "claims": [
+    {
+      "id": "claim_73e203e888814122b2710ad5029cc478",
+      "statement": "The container image is a single-process python:3.12-slim build whose entrypoint execs one uvicorn process serving both the read-only API and the HTML dashboard on port 8080, running as non-root uid 10001.",
+      "evidence": [
+        {
+          "resource": "repo://Dockerfile",
+          "version": "repo-file-v1:sha256:54b139436db78801a9341685054a282115c0c84f256ead25cb2aebdf18958c10"
+        },
+        {
+          "resource": "repo://docker/entrypoint.sh",
+          "version": "repo-file-v1:sha256:e97eddfdf300efe8e14470d34dae1a673fc76e1fa951542f559070eb125780d3"
+        }
+      ]
+    },
+    {
+      "id": "claim_c0fcf82ef54947129e109ce5efbf9701",
+      "statement": "The image installs the cluster, viz, rag, rag-semantic, and pptx extras and pre-downloads the fastembed BAAI/bge-small-en-v1.5 model so opt-in semantic RAG works offline, as a best-effort step that falls back to extractive at runtime if the download fails.",
+      "evidence": [
+        {
+          "resource": "repo://Dockerfile",
+          "version": "repo-file-v1:sha256:54b139436db78801a9341685054a282115c0c84f256ead25cb2aebdf18958c10"
+        }
+      ]
+    },
+    {
+      "id": "claim_c0a95e6c1ec6429e98af0a93e5ad39ac",
+      "statement": "The Helm chart creates a ServiceAccount and a ClusterRole limited to get/list/watch verbs with no write verbs, bound via a ClusterRoleBinding, enforcing read-only access by construction.",
+      "evidence": [
+        {
+          "resource": "repo://deploy/helm/templates/rbac.yaml",
+          "version": "repo-file-v1:sha256:39713c10f9b2167492279302802f751e1571e1440ff8398815b4f1146ef7a30f"
+        },
+        {
+          "resource": "repo://deploy/helm/values.yaml",
+          "version": "repo-file-v1:sha256:19f2361e0d34c7e5f4a10338959907e7272761ef832eeb90d9a1662f40d0e52d"
+        }
+      ]
+    },
+    {
+      "id": "claim_8e73581a51f84cb584410758260cfbf1",
+      "statement": "The Deployment hardens the pod with runAsNonRoot, runAsUser 10001, allowPrivilegeEscalation false, readOnlyRootFilesystem true, all capabilities dropped, and a writable /tmp emptyDir, and defaults to extractive mode, clusterEnabled true, and namespace open5gs.",
+      "evidence": [
+        {
+          "resource": "repo://deploy/helm/templates/deployment.yaml",
+          "version": "repo-file-v1:sha256:ce94623a8a60089b38b95e3ca633a9fb40128a35e8eb25b3062ba012564e28ce"
+        },
+        {
+          "resource": "repo://deploy/helm/values.yaml",
+          "version": "repo-file-v1:sha256:19f2361e0d34c7e5f4a10338959907e7272761ef832eeb90d9a1662f40d0e52d"
+        }
+      ]
+    },
+    {
+      "id": "claim_60f950844922437580bb08be62fd7458",
+      "statement": "The Deployment uses a liveness probe on /healthz and a readiness probe on /readyz, and /readyz reflects the background graph build by returning ready once the reasoning flow is initialized.",
+      "evidence": [
+        {
+          "resource": "repo://deploy/helm/templates/deployment.yaml",
+          "version": "repo-file-v1:sha256:ce94623a8a60089b38b95e3ca633a9fb40128a35e8eb25b3062ba012564e28ce"
+        },
+        {
+          "resource": "repo://src/rca_agent/webhook/app.py",
+          "version": "repo-file-v1:sha256:27dff6f5e665637eb6e3509f7d5ed4b12c87982c6c2d1ff9f4534f8b7fb07252"
+        }
+      ]
+    },
+    {
+      "id": "claim_60a6d62253e94256a249a889addcda86",
+      "statement": "release.sh builds and packages the agent (and optionally sidecar) images into dist/, and deploy-cobra.sh --with-llm starts the sidecar with the GGUF model mounted read-only on loopback and falls back to extractive deployment if the sidecar does not come up.",
+      "evidence": [
+        {
+          "resource": "repo://docker/SIDECAR.md",
+          "version": "repo-file-v1:sha256:15f21373f120130ce5b31aec5dfd0bda2a44034fbea5921ca143d423a1962b96"
+        },
+        {
+          "resource": "repo://scripts/release.sh",
+          "version": "repo-file-v1:sha256:262b1dd9073e143b904e58d784ff255359a4378e068cc98e14bb8c184014222b"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T19:34:26.963Z"
+  }
+}

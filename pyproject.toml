@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "k8s-rca-agent"
-version = "0.10.1"
+version = "0.12.0"
 description = "Read-only Kubernetes fault detection & root-cause agent for a 5G core (GraphRAG-style reasoning over a live dependency graph)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -22,6 +22,8 @@ dependencies = [
     "jinja2>=3.1",
     "python-multipart>=0.0.9",
     "openpyxl>=3.1",
+    "psycopg[binary]>=3.1",
+    "psycopg_pool>=3.2",
 ]
 
 [project.optional-dependencies]
@@ -76,6 +78,7 @@ pptx = [
 dev = [
     "pytest>=8.0",
     "ruff>=0.4",
+    "hypothesis>=6.0",
     "pyvis>=0.3.2",
     "pypdf>=4.0",
     "python-pptx>=0.6.23",
@@ -95,6 +98,17 @@ rca_agent = ["webhook/templates/*.html", "webhook/static/*"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+# Scope linting to the project's own source, tests, and tooling. The AIDE
+# support plane (.aide/), generated wiki (openwiki/), and Kiro steering (.kiro/)
+# are not application code and are maintained outside this repo's lint gate, so
+# they must not block `ruff check .` in scripts/release.sh. (ruff's built-in
+# defaults such as .venv/ and egg-info are preserved by extend-exclude.)
+extend-exclude = [
+    ".aide",
+    ".kiro",
+    "openwiki",
+    "dist",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:37d72def323cd3eb90905e2ed1d98cc6e700f788c84b964952a30ea76e6fbd25",
+  "claims": [
+    {
+      "id": "claim_69a31ba984104d6da2271f449409e181",
+      "statement": "The Makefile provides make test (pytest), make lint (Ruff), make check (lint plus test), and make eval (the accuracy harness), and the harness can also run via python -m rca_agent.eval with --no-write and --min-top2 flags.",
+      "evidence": [
+        {
+          "resource": "repo://Makefile",
+          "version": "repo-file-v1:sha256:864a1546e4010497c402435f71f3f09d93659c52d01278f9b761ba175b5d90ba"
+        },
+        {
+          "resource": "repo://src/rca_agent/eval/README.md",
+          "version": "repo-file-v1:sha256:9439de6405b68cbd3fce1b5f628db317e745dd1af51b5be732949b86f9f6524f"
+        }
+      ]
+    },
+    {
+      "id": "claim_9633ed8508ec407d9dc4610840ca989b",
+      "statement": "The pytest suite provides verification coverage across the graph, reasoning, event watcher, webhook, runbook/semantic RAG, impact loader, service anchoring, PPTX export, dashboard, and ASCII safety.",
+      "evidence": [
+        {
+          "resource": "repo://tests/test_anchor_phase1.py",
+          "version": "repo-file-v1:sha256:f6ff4c3075515e5cdd0b01d863360f3956455a5ec0e4e12658a1d475a2db3524"
+        },
+        {
+          "resource": "repo://tests/test_cluster_graph.py",
+          "version": "repo-file-v1:sha256:6a035fccf12095efb16f2f1ded1dadd83a52284ab68d554089462b0facc55eb0"
+        },
+        {
+          "resource": "repo://tests/test_event_watcher.py",
+          "version": "repo-file-v1:sha256:db3a05dd73d19f255f12511ebce3f6df9916938041ae5fa72b7ac17b50551f5c"
+        },
+        {
+          "resource": "repo://tests/test_runbook_rag.py",
+          "version": "repo-file-v1:sha256:a1d318b48c52a1feeba7e7d2092ded2a82d1dfd14ffbb7ac9714da36f21fb784"
+        }
+      ]
+    },
+    {
+      "id": "claim_c8080ed4dbf64160a3615d6077efd9b3",
+      "statement": "The eval harness is an offline, cluster-free benchmark that injects a known fault into a fake Kubernetes cluster and runs the real extractive ReasoningFlow with cluster_enabled=True to measure whether the ranked hypotheses name the correct root cause.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/eval/README.md",
+          "version": "repo-file-v1:sha256:9439de6405b68cbd3fce1b5f628db317e745dd1af51b5be732949b86f9f6524f"
+        },
+        {
+          "resource": "repo://src/rca_agent/eval/runner.py",
+          "version": "repo-file-v1:sha256:db82e6da97cb7251e0c759cd0503d89b1ab6eab78ef28d1b5cf830c7ae78cc87"
+        }
+      ]
+    },
+    {
+      "id": "claim_1ed175be287f414c9a52a881a9bc630d",
+      "statement": "The runner never crashes on a single case; an exception during one case is captured as a per-case error in the result.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/eval/runner.py",
+          "version": "repo-file-v1:sha256:db82e6da97cb7251e0c759cd0503d89b1ab6eab78ef28d1b5cf830c7ae78cc87"
+        }
+      ]
+    },
+    {
+      "id": "claim_6cb7c70b8f214ce699896a45586e89a7",
+      "statement": "The headline metric is top-2 accuracy (correct when the known cause is among the first two hypotheses), with top-1 and the 1-based matched rank also recorded for diagnostics.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/eval/README.md",
+          "version": "repo-file-v1:sha256:9439de6405b68cbd3fce1b5f628db317e745dd1af51b5be732949b86f9f6524f"
+        },
+        {
+          "resource": "repo://src/rca_agent/eval/scorer.py",
+          "version": "repo-file-v1:sha256:7bdca84d49c19201fd2f743ef5023b321fd3470f1192516bffab394b5be0bcc2"
+        }
+      ]
+    },
+    {
+      "id": "claim_d95e02a0e2fa455e9976cbfa4be191a1",
+      "statement": "The fault library has eight cases (OOMKilled, CrashLoopBackOff, ImagePullBackOff, readiness-probe failure, bad ConfigMap change, upstream cascade via a calls edge, node NotReady, and two simultaneous independent faults), and the README states it is not a substitute for live-cluster validation and that live chaos injection is out of scope.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/eval/README.md",
+          "version": "repo-file-v1:sha256:9439de6405b68cbd3fce1b5f628db317e745dd1af51b5be732949b86f9f6524f"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T19:34:26.963Z"
+  }
+}

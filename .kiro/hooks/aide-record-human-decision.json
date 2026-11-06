@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-record-human-decision",
+      "description": "Record only explicit, task-scoped human approve, reject, or revise events.",
+      "trigger": "UserPromptSubmit",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-record-human-decision"
+      },
+      "timeout": 20,
+      "enabled": true
+    }
+  ]
+}

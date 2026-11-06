@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "preparation_commands": [
+    "git status*",
+    "git diff*",
+    "git log*",
+    "git show*",
+    "git rev-parse*",
+    "git branch --show-current*",
+    "rg *",
+    "get-content *",
+    "get-childitem *",
+    "uv run --project .aide/full/hook --offline --frozen aide-hook *"
+  ],
+  "operations": {
+    "git": {
+      "repositories": [
+        "${workspace}"
+      ],
+      "branches": [
+        "*"
+      ],
+      "actions": [
+        "add",
+        "commit"
+      ]
+    },
+    "kubernetes": {
+      "contexts": [],
+      "namespaces": [],
+      "allow_mutations": false
+    },
+    "ansible": {
+      "inventories": [],
+      "allow_mutations": false
+    },
+    "http": {
+      "hosts": [],
+      "allow_live_mutations": false
+    },
+    "mcp": {
+      "mutating_tools": [
+        "@aide-azure-change-mcp/aide_apply_azure_deployment",
+        "@aide-kubernetes-change-mcp/aide_apply_kubernetes_manifest"
+      ]
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-task-evidence-capture",
+      "description": "Capture bounded, redacted evidence after tool use.",
+      "trigger": "PostToolUse",
+      "matcher": ".*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-task-evidence --phase capture"
+      },
+      "timeout": 20,
+      "enabled": true
+    },
+    {
+      "name": "aide-task-evidence-post-task",
+      "description": "Summarize evidence added during a completed task execution.",
+      "trigger": "PostTaskExec",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-task-evidence --phase post-task"
+      },
+      "timeout": 20,
+      "enabled": true
+    },
+    {
+      "name": "aide-task-evidence-stop",
+      "description": "Summarize evidence added before the agent stops.",
+      "trigger": "Stop",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-task-evidence --phase stop"
+      },
+      "timeout": 20,
+      "enabled": true
+    }
+  ]
+}

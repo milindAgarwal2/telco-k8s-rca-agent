@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "name": "git-hosting",
+  "purpose": "Optional issue and pull/merge request metadata for the selected hosting system.",
+  "upstream": "project-selected GitLab or GitHub MCP implementation",
+  "version": "unresolved",
+  "license": "unresolved",
+  "integrity": {"kind": "unresolved", "value": null, "artifact_hash": null},
+  "verified_on": null,
+  "runtime": "project-selected",
+  "transport": "stdio",
+  "supported_os": ["project-selected"],
+  "capabilities": ["issue metadata", "pull or merge request metadata", "remote repository metadata"],
+  "setup_steps": ["Select the actual GitLab or GitHub host", "Pin and license-review its server", "Provide a least-privilege local token reference and keep write/merge tools disabled by default"],
+  "health_check": "MCP initialize and tools/list; a metadata read requires separate host approval",
+  "secret_refs": ["AIDE_GIT_HOST_TOKEN"],
+  "requires_explicit_configuration": true,
+  "kiro_template": {"command": "git-hosting-mcp-command-must-be-configured", "args": [], "env": {"TOKEN": "${AIDE_GIT_HOST_TOKEN}"}},
+  "corrective_action": "Select one hosting provider and pin its official/reviewed server. Local Git remains available without this integration.",
+  "permissions": "Metadata reads by default; creating or merging changes requires explicit human authorization.",
+  "removal_owner": "AIDE-managed mcpServers.git-hosting key only"
+}

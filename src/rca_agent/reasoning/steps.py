@@ -550,6 +550,44 @@ def build_service_area(state: ReasoningState, index) -> ReasoningState:
     return state
 
 
+def build_potential_alarms(state: ReasoningState, index) -> ReasoningState:
+    """Attach the CANDIDATE alarms the affected pod could have raised (scoped).
+
+    ``index`` is a PotentialAlarmsIndex or None (feature off). Looks up the
+    affected resource -- falling back to the first affected pod -- and, if the
+    pod is mapped, attaches the PotentialAlarms to the state plus one cited
+    evidence item. CONTEXT only (what could fire): it never creates or reweights
+    a hypothesis. A no-op when the feature is off or the pod is unmapped (no
+    fabricated alarms).
+    """
+    if index is None:
+        return state
+    candidates = [state.affected_resource, *state.affected_pods]
+    result = None
+    for pod in candidates:
+        if not pod:
+            continue
+        found = index.by_pod(pod)
+        if found.mapped:
+            result = found
+            break
+    if result is None:
+        return state
+
+    state.potential_alarms = result
+    state.add_evidence(Evidence(
+        category="alarms",
+        summary=result.summary_line(),
+        resource=result.pod,
+        citations=[Citation(
+            kind="alarms",
+            source="pod-alarm mapping workbook",
+            detail=f"{len(result.alarms)} candidate alarm(s)",
+        )],
+    ))
+    return state
+
+
 def _utcnow():
     from datetime import datetime, timezone
     return datetime.now(timezone.utc)

@@ -1,0 +1,39 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-token-response-start",
+      "description": "Begin a metadata-only response cycle without retaining prompt content.",
+      "trigger": "PromptSubmit",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/mcp-servers/aide-token-saver --offline --frozen --no-sync aide-token-saver hook PromptSubmit --workspace ."
+      },
+      "timeout": 10,
+      "enabled": true
+    },
+    {
+      "name": "aide-token-tool-observer",
+      "description": "Record bounded tool payload sizes without retaining tool content.",
+      "trigger": "PostToolUse",
+      "matcher": ".*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/mcp-servers/aide-token-saver --offline --frozen --no-sync aide-token-saver hook PostToolUse --workspace ."
+      },
+      "timeout": 10,
+      "enabled": true
+    },
+    {
+      "name": "aide-token-response-stop",
+      "description": "Complete and retain aggregate response-cycle metrics without injecting context.",
+      "trigger": "Stop",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/mcp-servers/aide-token-saver --offline --frozen --no-sync aide-token-saver hook Stop --workspace ."
+      },
+      "timeout": 10,
+      "enabled": true
+    }
+  ]
+}

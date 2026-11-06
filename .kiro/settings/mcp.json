@@ -1,0 +1,349 @@
+{
+  "mcpServers": {
+    "aide-architecture-mcp": {
+      "args": [
+        "run",
+        "--project",
+        ".aide/full/mcp-servers/aide-architecture-mcp",
+        "--offline",
+        "--frozen",
+        "aide-architecture-mcp"
+      ],
+      "command": "uv",
+      "disabled": false,
+      "env": {
+        "AIDE_ARCHITECTURE_ROOT": "."
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "aide-azure-change-mcp": {
+      "args": [
+        "run",
+        "--project",
+        ".aide/full/mcp-servers/aide-azure-change-mcp",
+        "--offline",
+        "--frozen",
+        "aide-azure-change-mcp"
+      ],
+      "command": "uv",
+      "disabled": true,
+      "env": {
+        "AIDE_AZURE_CHANGE_PLAN_DIR": ".aide/local/azure-change-plans",
+        "AIDE_AZURE_CHANGE_POLICY_FILE": ".aide/local/azure-change-policy.json",
+        "AIDE_AZURE_TARGET_FILE": ".aide/local/azure-target.json",
+        "AIDE_WORKSPACE_ROOT": ".",
+        "PYTHONUTF8": "1"
+      },
+      "requestTimeout": 600000,
+      "timeout": 600000
+    },
+    "aide-azure-mcp": {
+      "args": [
+        "run",
+        "--project",
+        ".aide/full/mcp-servers/aide-azure-mcp",
+        "--offline",
+        "--frozen",
+        "aide-azure-mcp"
+      ],
+      "command": "uv",
+      "disabled": false,
+      "env": {
+        "AIDE_AZURE_TARGET_FILE": ".aide/local/azure-target.json",
+        "PYTHONUTF8": "1"
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "aide-knowledge-mcp": {
+      "args": [
+        "run",
+        "--project",
+        ".aide/full/mcp-servers/aide-knowledge-mcp",
+        "--offline",
+        "--frozen",
+        "aide-knowledge-mcp"
+      ],
+      "command": "uv",
+      "disabled": false,
+      "env": {
+        "AIDE_KNOWLEDGE_ROOT": "."
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "aide-kubernetes-change-mcp": {
+      "args": [
+        "run",
+        "--project",
+        ".aide/full/mcp-servers/aide-kubernetes-change-mcp",
+        "--offline",
+        "--frozen",
+        "aide-kubernetes-change-mcp"
+      ],
+      "command": "uv",
+      "disabled": true,
+      "env": {
+        "AIDE_KUBERNETES_CHANGE_PLAN_DIR": ".aide/local/kubernetes-change-plans",
+        "AIDE_WORKSPACE_ROOT": ".",
+        "KUBECONFIG": "${KUBECONFIG}",
+        "PYTHONUTF8": "1"
+      },
+      "requestTimeout": 600000,
+      "timeout": 600000
+    },
+    "aide-kubernetes-mcp": {
+      "args": [
+        "run",
+        "--project",
+        ".aide/full/mcp-servers/aide-kubernetes-mcp",
+        "--offline",
+        "--frozen",
+        "aide-kubernetes-mcp"
+      ],
+      "command": "uv",
+      "disabled": false,
+      "env": {
+        "KUBECONFIG": "${KUBECONFIG}",
+        "PYTHONUTF8": "1"
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "aide-spec-mcp": {
+      "args": [
+        "run",
+        "--project",
+        ".aide/full/mcp-servers/aide-spec-mcp",
+        "--offline",
+        "--frozen",
+        "aide-spec-mcp"
+      ],
+      "command": "uv",
+      "disabled": false,
+      "env": {
+        "AIDE_SPEC_ROOT": "."
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "aide-token-saver": {
+      "args": [
+        "run",
+        "--project",
+        ".aide/full/mcp-servers/aide-token-saver",
+        "--offline",
+        "--frozen",
+        "--no-sync",
+        "aide-token-saver-mcp"
+      ],
+      "autoApprove": [
+        "aide_token_stats",
+        "aide_token_report",
+        "aide_kiro_metrics"
+      ],
+      "command": "uv",
+      "disabled": false,
+      "env": {
+        "AIDE_TOKEN_SAVER_POLICY": ".aide/full/mcp-servers/aide-token-saver/policy.json",
+        "AIDE_TOKEN_SAVER_STATE_DIR": ".aide/local/token-saver",
+        "AIDE_WORKSPACE_ROOT": "."
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "devportal": {
+      "disabled": true,
+      "headers": {
+        "Authorization": "Bearer ${DEVPORTAL_PAT}"
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000,
+      "url": "https://devportal.internal.ericsson.com/api/mcp-actions/v1"
+    },
+    "eds-mcp": {
+      "disabled": false,
+      "url": "https://eds.internal.ericsson.com/mcp"
+    },
+    "filesystem": {
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem@2026.8.31",
+        "."
+      ],
+      "command": "cmd",
+      "disabled": false,
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "git": {
+      "args": [
+        "--from",
+        "mcp-server-git==2026.8.18",
+        "mcp-server-git",
+        "--repository",
+        "."
+      ],
+      "command": "uvx",
+      "disabled": false,
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "glean": {
+      "disabled": false,
+      "timeout": 30000,
+      "type": "http",
+      "url": "https://be.everyday-assistant.ericsson.net/mcp/EEA-KIRO-MCP"
+    },
+    "graphiti": {
+      "args": [
+        "run",
+        "--project",
+        ".aide/full/spec-brain",
+        "--offline",
+        "--frozen",
+        "aide-spec-brain-mcp"
+      ],
+      "command": "uv",
+      "disabled": true,
+      "env": {
+        "SPEC_BRAIN_ROOT": "."
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "jira": {
+      "args": [
+        "--from",
+        "mcp-atlassian==0.23.1",
+        "mcp-atlassian"
+      ],
+      "autoApprove": [],
+      "command": "uvx",
+      "disabled": false,
+      "env": {
+        "JIRA_PERSONAL_TOKEN": "${JIRA_PERSONAL_TOKEN}",
+        "JIRA_SSL_VERIFY": "true",
+        "JIRA_URL": "https://eteamproject.ericsson.net",
+        "JIRA_USERNAME": "${JIRA_USERNAME}"
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "lean-ctx": {
+      "args": [],
+      "command": "lean-ctx",
+      "disabled": true,
+      "env": {
+        "LEAN_CTX_NO_UPDATE_CHECK": "1"
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "memory": {
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-memory@2026.8.31"
+      ],
+      "command": "cmd",
+      "disabled": false,
+      "env": {
+        "MEMORY_FILE_PATH": ".aide/local/memory.jsonl"
+      }
+    },
+    "neo4j": {
+      "args": [
+        "--from",
+        "neo4j-mcp-server==1.5.3",
+        "neo4j-mcp-server"
+      ],
+      "command": "uvx",
+      "disabled": false,
+      "env": {
+        "NEO4J_DATABASE": "neo4j",
+        "NEO4J_LOG_FORMAT": "text",
+        "NEO4J_LOG_LEVEL": "info",
+        "NEO4J_PASSWORD": "${NEO4J_PASSWORD}",
+        "NEO4J_READ_ONLY": "true",
+        "NEO4J_SCHEMA_SAMPLE_SIZE": "100",
+        "NEO4J_TELEMETRY": "false",
+        "NEO4J_TRANSPORT_MODE": "stdio",
+        "NEO4J_URI": "bolt://localhost:7687",
+        "NEO4J_USERNAME": "neo4j"
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "openwiki": {
+      "args": [
+        "mcp",
+        "--host",
+        "kiro"
+      ],
+      "command": "openwiki",
+      "disabled": false,
+      "env": {
+        "DO_NOT_TRACK": "1",
+        "OPENWIKI_TELEMETRY_DISABLED": "1"
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "postgres": {
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@microsoft/postgres-mcp@0.1.0-rc.10",
+        "run",
+        "--no-telemetry"
+      ],
+      "command": "cmd",
+      "disabled": false,
+      "env": {
+        "POSTGRES_MCP_DISABLE_CWD_ACCESS": "1",
+        "POSTGRES_MCP_QUERY_TIMEOUT_MS": "30000"
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    },
+    "postgresql": {
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-postgres@0.6.2",
+        "${POSTGRESQL_URL}"
+      ],
+      "command": "cmd",
+      "disabled": true,
+      "env": {
+        "POSTGRESQL_URL": "${POSTGRESQL_URL}"
+      }
+    },
+    "scas": {
+      "args": [
+        "run",
+        "--project",
+        ".aide/full/scas",
+        "--offline",
+        "--frozen",
+        "framework-governance-mcp"
+      ],
+      "command": "uv",
+      "disabled": false,
+      "env": {
+        "PYTHONUTF8": "1",
+        "SCAS_KNOWLEDGE_ROOT": ".aide/full/scas/knowledge-base",
+        "SCAS_REFRESH_TOKEN": "${SCAS_REFRESH_TOKEN}"
+      },
+      "requestTimeout": 120000,
+      "timeout": 120000
+    }
+  }
+}

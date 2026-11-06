@@ -1,0 +1,27 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-workflow-checkpoint-post-task",
+      "description": "Derive a pending workflow checkpoint after meaningful task execution.",
+      "trigger": "PostTaskExec",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-workflow-checkpoint --phase post-task"
+      },
+      "timeout": 20,
+      "enabled": true
+    },
+    {
+      "name": "aide-workflow-checkpoint-stop",
+      "description": "Persist blockers, verification, approval state, and next action when Kiro stops.",
+      "trigger": "Stop",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-workflow-checkpoint --phase stop"
+      },
+      "timeout": 20,
+      "enabled": true
+    }
+  ]
+}

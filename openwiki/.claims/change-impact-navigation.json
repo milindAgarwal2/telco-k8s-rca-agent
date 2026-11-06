@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:109a97a04636c969cea599cb4c41e44354d02f381810b35d35b895af5d32eb1d",
+  "claims": [
+    {
+      "id": "claim_678a57b187c44a5493f98c05573d1a5d",
+      "statement": "Each project folder contains exactly one SPECS.md whose section 6 'Interaction points' table declares the folder's outbound dependencies and inbound consumers.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/models/SPECS.md",
+          "version": "repo-file-v1:sha256:4cce7486520b0f23636c94ece5f3e0ca81e9c93386e324c86ab37c91d813ec77"
+        },
+        {
+          "resource": "repo://src/rca_agent/reasoning/SPECS.md",
+          "version": "repo-file-v1:sha256:50a5af5881efc26f95b765118213fbd657361e0f1c6c7d3f05ac6b94b506fba6"
+        },
+        {
+          "resource": "repo://src/rca_agent/webhook/SPECS.md",
+          "version": "repo-file-v1:sha256:e295330911230a809ee5619a9ed269c8611ff44acbbe25d15070a06074590d6d"
+        }
+      ]
+    },
+    {
+      "id": "claim_31cfd101db7547569f08a45d44c5f5e9",
+      "statement": "The repository-root SPECS.md indexes every folder specification in its repository specification index section, listing 27 in-scope specifications (the root plus 26 subfolders).",
+      "evidence": [
+        {
+          "resource": "repo://SPECS.md",
+          "version": "repo-file-v1:sha256:1a2aabb6feec5487b5ecd48c958190d8518b14acfda02040b9efe228b0c4ce56"
+        }
+      ]
+    },
+    {
+      "id": "claim_614e4e69c3d8452190f7e4ad09732ca8",
+      "statement": "The src/rca_agent/models folder declares one outbound dependency (to impact for ServiceAreaImpact) and six inbound consumers (webhook, detection, reasoning, tools, eval, and the parent package), making it the most-consumed contract in the application.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/models/SPECS.md",
+          "version": "repo-file-v1:sha256:4cce7486520b0f23636c94ece5f3e0ca81e9c93386e324c86ab37c91d813ec77"
+        }
+      ]
+    },
+    {
+      "id": "claim_6b5643ba0b9b457e8a34150fa6a666cc",
+      "statement": "knowledge-base/SPECS-RELATIONSHIP-MAP.md is a navigation and impact-analysis summary built by normalizing each folder's section-6 table into one catalog, and it states that a declared dependency edge proves a recorded relationship, not a specific runtime call, execution order, data format, or deployment topology.",
+      "evidence": [
+        {
+          "resource": "repo://knowledge-base/SPECS-RELATIONSHIP-MAP.md",
+          "version": "repo-file-v1:sha256:d618a741d96af1823540fb55cf4a95898ae69fff8ee169cbc29292f8ab73117a"
+        }
+      ]
+    },
+    {
+      "id": "claim_27c93a62ebee42b791850bc27242b582",
+      "statement": "IncidentReport keeps newer fields such as affected_anchor, anchor_kind, affected_pods, and resolved_at defaulted so that older serialized reports and existing callers remain backward-compatible.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/models/incident.py#L58-L82",
+          "version": "repo-lines-v1:sha256:da3a0b5c223c92dea2ea33d0ec6ea2fbd3317bf921e4864a51126579988828ad:eyJzZWxlY3RlZExpbmVDb3VudCI6MjUsImZpcnN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJsYXN0U2VsZWN0ZWRMaW5lSGFzaCI6IjAxYmE0NzE5YzgwYjZmZTkxMWIwOTFhN2MwNTEyNGI2NGVlZWNlOTY0ZTA5YzA1OGVmOGY5ODA1ZGFjYTU0NmIiLCJwcmVjZWRpbmdDb250ZXh0TGluZUNvdW50IjozLCJwcmVjZWRpbmdDb250ZXh0SGFzaCI6ImEwMjZmNGEwYTMyNjAzZDhhYTk2ZDNmOWE1ZTEyNmI3NjIwY2VmMTNiMmVmYjE1OTRhOTJjYTkyYWY2OGJjYzMiLCJmb2xsb3dpbmdDb250ZXh0TGluZUNvdW50IjozLCJmb2xsb3dpbmdDb250ZXh0SGFzaCI6IjVlNjMwYzc1MmY0YWNjNjM0OGU0Yzg3ODVjZjc2N2E4Yjk4NmZmMWM3MjEyZTk1ZGIwOGFmOGU0ZGFkYWNkY2MifQ"
+        }
+      ]
+    },
+    {
+      "id": "claim_087b6971d9dd4a73b358a44b6d1e8e58",
+      "statement": "The specification relationship map records each dependency edge's declaring perspective (outbound only, inbound only, or both) and states that a one-sided declaration is a review signal rather than an automatic defect, and that dynamic and deployment-only relationships are not proven as runtime calls by the static map.",
+      "evidence": [
+        {
+          "resource": "repo://knowledge-base/SPECS-RELATIONSHIP-MAP.md",
+          "version": "repo-file-v1:sha256:d618a741d96af1823540fb55cf4a95898ae69fff8ee169cbc29292f8ab73117a"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T20:42:17.288Z"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:7f6b7d46b3fb884795aca7a29ea2f8459e3b53e93ef7a5c2f26b397b6964d973",
+  "claims": [
+    {
+      "id": "claim_b805c2fadcb94bfeb54d4cff62e1417c",
+      "statement": "All configuration is read from environment variables with the RCA_ prefix (or a .env file) via the Settings class in src/rca_agent/config.py, with defaults chosen to run in no-LLM extractive mode without a cluster.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        }
+      ]
+    },
+    {
+      "id": "claim_59250b6bcf3e4af9a13b2e6ece9d3f4f",
+      "statement": "The out-of-the-box defaults reasoning_mode=extractive, cluster_enabled=False, and the resulting demo graph let the agent run with no external dependencies.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        },
+        {
+          "resource": "repo://src/rca_agent/graph/builder.py",
+          "version": "repo-file-v1:sha256:04c9f826ccef3c75ecfde12ce04235fea1b98aa0ff2ce5fccbe0ee191cb07b8e"
+        }
+      ]
+    },
+    {
+      "id": "claim_e692b2cc8bbc47139c7e98746e92f87c",
+      "statement": "Cluster and detection settings include cluster_enabled, kubeconfig_mode (auto/incluster/local), namespace (default open5gs), nf_selector, event_watch_enabled, event_watch_interval_seconds, event_max_age_minutes, status_detection_enabled, status_unhealthy_rebuilds, and incident_correlation_window_minutes.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        }
+      ]
+    },
+    {
+      "id": "claim_6e8483a6f6cc47a29338c6aea9bc3596",
+      "statement": "Optional features fail safe: metrics are skipped when prometheus_url is unset, semantic RAG falls back to the extractive retriever unless its flag, dependencies, and a reachable LLM sidecar all hold, and the service-area feature is inert unless service_area_map_path is set and present.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        }
+      ]
+    },
+    {
+      "id": "claim_6aa986574e7f4a7cbc24d095640ae97c",
+      "statement": "LLM settings (used only when reasoning_mode is llm) include llm_base_url defaulting to loopback http://127.0.0.1:8090, and any LLM error or unavailable sidecar falls back to the deterministic extractive order so enabling the LLM never changes which causes exist.",
+      "evidence": [
+        {
+          "resource": "repo://docker/SIDECAR.md",
+          "version": "repo-file-v1:sha256:15f21373f120130ce5b31aec5dfd0bda2a44034fbea5921ca143d423a1962b96"
+        },
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        }
+      ]
+    },
+    {
+      "id": "claim_e5e26d9d22444f3f81e594758a1c650d",
+      "statement": "Incident capture is off by default (empty incident_capture_path), and its comment warns that capture records include real log lines and object names so the file is sensitive; incident_capture_redact_logs drops log bodies while keeping reasons and timestamps.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/config.py",
+          "version": "repo-file-v1:sha256:fcad95c35e7e530f4665915f4ec422591810ea3dff9ea81d22498b2a09f5e1d9"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T19:34:26.963Z"
+  }
+}

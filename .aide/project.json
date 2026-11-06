@@ -1,0 +1,59 @@
+{
+  "baseline_version": "0.16.11",
+  "components": [
+    "optional-agents",
+    "profiles",
+    "shared",
+    "workflows"
+  ],
+  "excluded_items": [],
+  "flavor": "full",
+  "integrations": [],
+  "kiro_target": "cli2",
+  "module_mappings": [
+    {
+      "path": ".",
+      "profiles": [
+        "python"
+      ]
+    },
+    {
+      "path": "deploy",
+      "profiles": [
+        "kubernetes"
+      ]
+    },
+    {
+      "path": "docker",
+      "profiles": [
+        "bash"
+      ]
+    },
+    {
+      "path": "scripts",
+      "profiles": [
+        "bash",
+        "python"
+      ]
+    },
+    {
+      "path": "src",
+      "profiles": [
+        "python"
+      ]
+    },
+    {
+      "path": "tests",
+      "profiles": [
+        "python"
+      ]
+    }
+  ],
+  "profiles": [
+    "bash",
+    "kubernetes",
+    "python"
+  ],
+  "schema_version": 1,
+  "validation": []
+}

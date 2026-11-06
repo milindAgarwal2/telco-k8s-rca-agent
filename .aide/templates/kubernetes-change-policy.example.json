@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "manifest_roots": [
+    "deploy/kubernetes"
+  ],
+  "allowed_kinds": [],
+  "allow_create": false,
+  "allow_update": false,
+  "max_objects": 10,
+  "plan_ttl_minutes": 30,
+  "field_manager": "aide-baseline"
+}

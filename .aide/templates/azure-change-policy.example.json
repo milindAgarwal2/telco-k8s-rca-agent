@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "enabled": false,
+  "template_roots": [
+    "infra/azure"
+  ],
+  "allowed_resource_types": [],
+  "allow_create": false,
+  "allow_modify": false,
+  "max_changes": 10,
+  "plan_ttl_minutes": 30
+}

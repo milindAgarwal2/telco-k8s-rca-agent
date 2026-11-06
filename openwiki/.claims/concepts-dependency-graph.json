@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "pageVersion": "sha256:bd70164dc99acd5ba6bffb6167b7008097ade8397f855eb2be4be9d9b71d0696",
+  "claims": [
+    {
+      "id": "claim_c2d793d24be441e4b4e9780f4f74f1c5",
+      "statement": "The dependency graph is a live, timestamped, directed NetworkX multigraph of one NF application in one namespace, with node kinds network_function, service, pod, node, configmap, secret, pvc, deployment, and replicaset.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/graph/dependency_graph.py",
+          "version": "repo-file-v1:sha256:d39aa6126d26a29405a0106594ac57a9ee4cf1feb15bf8f7b2aa29b72477147b"
+        }
+      ]
+    },
+    {
+      "id": "claim_487495a84c8944cd85a612fba906894a",
+      "statement": "Edge kinds are calls (A depends on B, B upstream of A), runs_on (pod to node), mounts (pod to configmap/secret/pvc), managed_by (pod to replicaset/deployment), and selects (service to pod).",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/graph/dependency_graph.py",
+          "version": "repo-file-v1:sha256:d39aa6126d26a29405a0106594ac57a9ee4cf1feb15bf8f7b2aa29b72477147b"
+        }
+      ]
+    },
+    {
+      "id": "claim_f33ec452385249289d137a1c6330bc02",
+      "statement": "A workload node's health is rolled up from its managed pods: all healthy gives healthy, none healthy gives down, a mix gives degraded, and no pods or no information gives unknown.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/graph/dependency_graph.py",
+          "version": "repo-file-v1:sha256:d39aa6126d26a29405a0106594ac57a9ee4cf1feb15bf8f7b2aa29b72477147b"
+        }
+      ]
+    },
+    {
+      "id": "claim_1b399bc733b5474dac67d95ad59d598c",
+      "statement": "Every node and edge carries change timestamps so the graph state at the start of a fault can be reconstructed, and graph mutation is performed only by the builders and never by the LLM.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/graph/dependency_graph.py",
+          "version": "repo-file-v1:sha256:d39aa6126d26a29405a0106594ac57a9ee4cf1feb15bf8f7b2aa29b72477147b"
+        }
+      ]
+    },
+    {
+      "id": "claim_3fb72f495a1949f68c97dbf8e9bb2714",
+      "statement": "calls edges are derived only from a grounded signal (a container's literal env var values and mounted/envFrom ConfigMap values matched against another Service name in the graph), so a missing match means no edge rather than a guessed dependency.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/graph/builder.py",
+          "version": "repo-file-v1:sha256:04c9f826ccef3c75ecfde12ce04235fea1b98aa0ff2ce5fccbe0ee191cb07b8e"
+        }
+      ]
+    },
+    {
+      "id": "claim_7bfef2257e3d44ac8e2a961fb745b3e5",
+      "statement": "When cluster_enabled is False (the default), GraphBuilder.rebuild returns a built-in demo graph so the system runs without a cluster.",
+      "evidence": [
+        {
+          "resource": "repo://src/rca_agent/graph/builder.py",
+          "version": "repo-file-v1:sha256:04c9f826ccef3c75ecfde12ce04235fea1b98aa0ff2ce5fccbe0ee191cb07b8e"
+        }
+      ]
+    },
+    {
+      "id": "claim_7104b426be3b4ab5a66ddfc3aaa11ab1",
+      "statement": "Cluster-free tests build the graph from a fake Kubernetes client and assert that pods, nodes, and the workload are discovered with correct node kinds and that runs_on, managed_by, and mounts edges are created.",
+      "evidence": [
+        {
+          "resource": "repo://tests/test_cluster_graph.py",
+          "version": "repo-file-v1:sha256:6a035fccf12095efb16f2f1ded1dadd83a52284ab68d554089462b0facc55eb0"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "by": "openwiki/0.4.3",
+    "at": "2026-11-03T19:34:26.963Z"
+  }
+}

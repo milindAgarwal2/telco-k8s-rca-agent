@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "name": "jira",
+  "purpose": "Retrieve one explicitly requested issue for the local Jira-to-EARS specification workflow.",
+  "upstream": "organization-selected Jira MCP implementation",
+  "version": "unresolved",
+  "license": "unresolved",
+  "integrity": {
+    "kind": "unresolved",
+    "value": null,
+    "artifact_hash": null
+  },
+  "verified_on": null,
+  "runtime": "organization-selected",
+  "transport": "stdio or HTTP",
+  "supported_os": ["service-dependent"],
+  "capabilities": ["read one issue by exact key"],
+  "setup_steps": [
+    "Select and review the Jira MCP implementation used by the organization",
+    "Configure authentication outside the repository",
+    "Restrict the agent to issue reads and verify the exposed tool list"
+  ],
+  "health_check": "MCP initialize and tools/list; issue retrieval requires separate service authorization",
+  "secret_refs": [],
+  "requires_explicit_configuration": true,
+  "kiro_template": {
+    "command": "jira-mcp-command-must-be-configured",
+    "args": []
+  },
+  "corrective_action": "Configure an approved Jira MCP locally or keep the Jira import workflow unavailable.",
+  "permissions": "Read one explicitly requested issue. Creating or changing Jira issues is outside this integration.",
+  "removal_owner": "AIDE-managed mcpServers.jira key only"
+}

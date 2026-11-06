@@ -1,0 +1,29 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "aide-kubernetes-read-only",
+      "description": "Allow only fixed AIDE Kubernetes observation tools and harmless local kubectl checks.",
+      "trigger": "PreToolUse",
+      "matcher": "shell|execute_bash|powershell|@aide-kubernetes-mcp/.*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-kubernetes-read-only"
+      },
+      "timeout": 20,
+      "enabled": true
+    },
+    {
+      "name": "aide-kubernetes-observation-evidence",
+      "description": "Record bounded Kubernetes observation metadata without cluster payloads.",
+      "trigger": "PostToolUse",
+      "matcher": "@aide-kubernetes-mcp/.*",
+      "action": {
+        "type": "command",
+        "command": "uv run --project .aide/full/hook --offline --frozen aide-hook aide-kubernetes-observation-evidence"
+      },
+      "timeout": 20,
+      "enabled": true
+    }
+  ]
+}

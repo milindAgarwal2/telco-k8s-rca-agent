@@ -63,6 +63,7 @@ from rca_agent.graph.builder import GraphBuilder
 from rca_agent.models.alert import Alert, KubeEvent
 from rca_agent.models.incident import IncidentReport
 from rca_agent.reasoning.flow import ReasoningFlow
+from rca_agent.store.incident_store import IncidentStore
 
 logger = logging.getLogger("rca_agent.detection")
 
@@ -91,10 +92,17 @@ class EventWatcher:
     """
 
     def __init__(self, settings: Settings, builder: GraphBuilder,
-                flow_factory: Callable[[], ReasoningFlow]) -> None:
+                flow_factory: Callable[[], ReasoningFlow],
+                incident_store: IncidentStore | None = None) -> None:
         self.settings = settings
         self.builder = builder
         self._flow_factory = flow_factory
+        # Durable store for write-through (Req 2). Optional so existing
+        # callers/tests that construct the watcher without a DB keep working:
+        # when None, _persist is a no-op and the watcher behaves exactly as
+        # before. The app wires this in once the store is connected (see
+        # webhook/app.py _startup_store).
+        self._incident_store = incident_store
         self._seen_uids: OrderedDict[str, None] = OrderedDict()
         self.incidents: list[IncidentReport] = []
         # Status-based detection state: node_id -> consecutive-unhealthy count.
@@ -221,6 +229,10 @@ class EventWatcher:
                 continue  # at least one pod still unhealthy -> stays active
             inc.status = "inactive"
             inc.resolved_at = _now()
+            # Persist the status/resolved_at flip so the durable record matches
+            # the live store (Req 2.3) -- this is the exact field that must
+            # survive a restart for the inactive tab.
+            self._persist(inc)
             # Let it re-fire if it breaks again: clear status-detection latches.
             for p in pods:
                 self._status_incident_open.discard(p)
@@ -307,14 +319,51 @@ class EventWatcher:
                 continue
             if pod_name and pod_name not in other.affected_pods:
                 other.affected_pods.append(pod_name)
+                # affected_pods changed -> persist the updated merge target
+                # (Req 2.4). Only when a merge actually mutated it.
+                self._persist(other)
             return other
         return None
+
+    def _persist(self, report: IncidentReport) -> None:
+        """Write-through one incident to the durable store (Req 2).
+
+        No-op when no store is wired (``self._incident_store is None``) so the
+        watcher behaves exactly as before in tests/dev. The write is NON-FATAL
+        (Req 5.3/5.4, Task 6.2): any failure is logged and swallowed so a DB
+        outage never breaks the poll loop or the webhook request handler. The
+        in-memory copy is kept and the next mutation re-persists, so memory and
+        DB reconverge.
+
+        Threading (D5): this runs the synchronous ``upsert`` inline, which is
+        correct because every caller is already OFF the event loop --
+        ``poll_once`` (and thus ``_store``/``reconcile_status``/``_correlate``/
+        ``_merge_into_open_anchor``) runs inside ``asyncio.to_thread`` in the
+        app, and ``record_external_incident`` runs in a synchronous FastAPI
+        request handler. This keeps event_watcher.py import-light and sync; we
+        deliberately do NOT introduce asyncio here.
+        """
+        if self._incident_store is None:
+            return
+        try:
+            self._incident_store.upsert(report)
+        except Exception:
+            logger.warning(
+                "event-watcher: failed to persist incident %s (non-fatal; "
+                "keeping in-memory copy, will re-persist on next mutation)",
+                report.incident_id, exc_info=True)
 
     def _store(self, report: IncidentReport, source: str = "event_watcher") -> None:
         self.incidents.append(report)
         if len(self.incidents) > _MAX_STORED_INCIDENTS:
             self.incidents.pop(0)
         self._correlate(report)
+        # Durable write-through (Req 2.1/2.2): persist after the in-memory
+        # append so the DB mirrors the live store for every create (event-,
+        # status- and webhook-sourced). _correlate above may already have
+        # persisted correlated incidents; re-persisting this one is harmless
+        # (idempotent upsert on incident_id).
+        self._persist(report)
         # Capture for later offline labeling (no-op unless configured).
         self.capture.record(report, source=source, graph=self.builder.graph)
 
@@ -354,6 +403,11 @@ class EventWatcher:
             by_id = {r.incident_id: r for r in self.incidents}
             for r in linked_this_call:
                 _apply_correlation_note(r, by_id)
+                # related_incidents / suggested_next_steps changed -> persist
+                # each affected incident so correlation notes are durable
+                # (Req 2.4). Includes `report` itself; _store's own _persist is
+                # an idempotent re-upsert.
+                self._persist(r)
 
     def get_incident(self, incident_id: str) -> IncidentReport | None:
         return next((r for r in self.incidents if r.incident_id == incident_id), None)
